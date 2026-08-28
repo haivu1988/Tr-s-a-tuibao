@@ -167,7 +167,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       branchId: regBranchId || (branches[0]?.id || 'cn_quan1'),
       avatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
       registeredDeviceId: null, // Sẽ tự động gán mã thiết bị khi chấm công lần đầu
-      hourlyRate: 28000,
+      hourlyRate: 22000, // Mức lương tiêu chuẩn: 22.000 đ/giờ
       department: 'Nhân viên Phục Vụ / Pha Chế',
       status: 'active',
     };

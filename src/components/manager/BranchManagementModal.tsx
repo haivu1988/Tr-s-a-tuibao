@@ -14,9 +14,15 @@ import {
   Pin, 
   Globe,
   Radio,
-  ChevronRight
+  ChevronRight,
+  DollarSign,
+  Edit2,
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
 import { fetchCurrentPublicIp, isValidIpAddress } from '../../utils/deviceWifi';
+import { EditSalaryModal } from './EditSalaryModal';
+import { AddStaffModal } from './AddStaffModal';
 
 interface BranchManagementModalProps {
   isOpen: boolean;
@@ -29,6 +35,9 @@ interface BranchManagementModalProps {
   allStaff: User[];
   onReassignStaffBranch: (userId: string, newBranchId: string) => void;
   onPinWifi: (branchId: string, wifiSsid: string) => void;
+  onUpdateStaffHourlyRate?: (userId: string, newRate: number) => void;
+  onAddStaff?: (newStaff: User) => void;
+  onDeleteStaff?: (userId: string) => void;
 }
 
 export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
@@ -42,6 +51,9 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
   allStaff = [],
   onReassignStaffBranch,
   onPinWifi,
+  onUpdateStaffHourlyRate,
+  onAddStaff,
+  onDeleteStaff,
 }) => {
   if (!isOpen) return null;
 
@@ -52,6 +64,9 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
   const [selectedBranchForStaff, setSelectedBranchForStaff] = useState<string>(activeBranchId);
   const [message, setMessage] = useState<string>('');
   const [isDetectingIp, setIsDetectingIp] = useState<boolean>(false);
+  const [editingStaffSalary, setEditingStaffSalary] = useState<User | null>(null);
+  const [isAddStaffOpen, setIsAddStaffOpen] = useState<boolean>(false);
+  const [deletingStaff, setDeletingStaff] = useState<User | null>(null);
 
   // New branch template
   const handleStartCreate = () => {
@@ -380,21 +395,34 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
           {/* TAB 2: STAFF ALLOCATION PER BRANCH */}
           {activeTab === 'staff' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <label className="text-xs font-bold text-slate-700">
-                  Xem nhân sự thuộc chi nhánh:
-                </label>
-                <select
-                  value={selectedBranchForStaff}
-                  onChange={(e) => setSelectedBranchForStaff(e.target.value)}
-                  className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center space-x-2">
+                  <label className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                    Xem chi nhánh:
+                  </label>
+                  <select
+                    value={selectedBranchForStaff}
+                    onChange={(e) => setSelectedBranchForStaff(e.target.value)}
+                    className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {onAddStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddStaffOpen(true)}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs hover:shadow-md transition-all cursor-pointer self-start sm:self-auto"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ Thêm Nhân Viên Mới</span>
+                  </button>
+                )}
               </div>
 
               {/* Staff table for this branch */}
@@ -404,7 +432,7 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
                     Danh sách ({currentBranchStaff.length} nhân sự)
                   </span>
                   <span className="text-slate-400 font-normal text-[11px]">
-                    *Có thể chuyển nhân viên sang chi nhánh khác
+                    *Có thể chỉnh lương, chuyển chi nhánh hoặc xóa nhân viên
                   </span>
                 </div>
 
@@ -431,8 +459,25 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Branch Transfer Selector */}
+                        {/* Branch Transfer Selector & Edit Salary & Delete */}
                         <div className="flex items-center space-x-2 shrink-0">
+                          {/* Mức lương */}
+                          <div className="flex items-center space-x-1">
+                            <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                              {(staff.hourlyRate || 22000).toLocaleString('vi-VN')} đ/h
+                            </span>
+                            {onUpdateStaffHourlyRate && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingStaffSalary(staff)}
+                                title="Chỉnh sửa mức lương cho nhân viên này"
+                                className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
                           <span className="text-[10px] text-slate-400 hidden sm:inline">
                             Chuyển sang:
                           </span>
@@ -451,12 +496,24 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
                               </option>
                             ))}
                           </select>
+
+                          {/* Delete staff button */}
+                          {onDeleteStaff && (
+                            <button
+                              type="button"
+                              onClick={() => setDeletingStaff(staff)}
+                              title="Xóa nhân viên khỏi hệ thống"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer ml-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))
                   ) : (
                     <div className="p-8 text-center text-xs text-slate-400">
-                      Chưa có nhân viên nào được phân vào chi nhánh này. Hãy chuyển nhân viên từ chi nhánh khác qua!
+                      Chưa có nhân viên nào được phân vào chi nhánh này. Bấm nút "+ Thêm Nhân Viên Mới" ở trên để tạo hồ sơ nhân viên!
                     </div>
                   )}
                 </div>
@@ -703,6 +760,78 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Edit Salary Modal */}
+      {editingStaffSalary && (
+        <EditSalaryModal
+          isOpen={!!editingStaffSalary}
+          onClose={() => setEditingStaffSalary(null)}
+          staff={editingStaffSalary}
+          branchName={branches.find((b) => b.id === editingStaffSalary.branchId)?.name}
+          onSaveRate={(userId, newRate) => {
+            if (onUpdateStaffHourlyRate) {
+              onUpdateStaffHourlyRate(userId, newRate);
+            }
+          }}
+        />
+      )}
+
+      {/* Add Staff Modal */}
+      {isAddStaffOpen && (
+        <AddStaffModal
+          isOpen={isAddStaffOpen}
+          onClose={() => setIsAddStaffOpen(false)}
+          branches={branches}
+          activeBranchId={selectedBranchForStaff || activeBranchId}
+          existingUsers={allStaff}
+          onAddStaff={(newStaff) => {
+            if (onAddStaff) {
+              onAddStaff(newStaff);
+            }
+          }}
+        />
+      )}
+
+      {/* Delete Staff Confirmation Modal */}
+      {deletingStaff && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 animate-in fade-in zoom-in-95 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h4 className="text-base font-bold text-slate-900">
+                Xóa Nhân Viên Khỏi Hệ Thống?
+              </h4>
+              <p className="text-xs text-slate-500">
+                Bạn có chắc chắn muốn xóa nhân viên <strong className="text-slate-800">{deletingStaff.name}</strong> (Mã: {deletingStaff.id})? Hành động này sẽ xóa tài khoản và hồ sơ nhân viên.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingStaff(null)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteStaff) {
+                    onDeleteStaff(deletingStaff.id);
+                  }
+                  setDeletingStaff(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-xs hover:shadow-md transition-all cursor-pointer"
+              >
+                Xác Nhận Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

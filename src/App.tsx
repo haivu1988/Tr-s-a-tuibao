@@ -38,6 +38,7 @@ import {
   subscribeAssignments,
   subscribeAttendance,
   saveUserToFirestore,
+  deleteUserFromFirestore,
   saveBranchToFirestore,
   deleteBranchFromFirestore,
   saveShiftRegistrationToFirestore,
@@ -55,6 +56,7 @@ import { BottomNav } from './components/layout/BottomNav';
 
 // Manager views
 import { ManagerDashboardView } from './components/manager/ManagerDashboardView';
+import { ManagerStaffView } from './components/manager/ManagerStaffView';
 import { ManagerScheduleView } from './components/manager/ManagerScheduleView';
 import { ManagerAttendanceView } from './components/manager/ManagerAttendanceView';
 import { ManagerReportsView } from './components/manager/ManagerReportsView';
@@ -74,6 +76,7 @@ import { StaffReportsView } from './components/staff/StaffReportsView';
 
 // Staff modals & Auth
 import { CheckInModal } from './components/staff/CheckInModal';
+import { AvatarModal } from './components/staff/AvatarModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { AuthScreen } from './components/auth/AuthScreen';
 
@@ -239,6 +242,7 @@ export default function App() {
   const [isAutoScheduleModalOpen, setIsAutoScheduleModalOpen] = useState<boolean>(false);
   const [isWifiModalOpen, setIsWifiModalOpen] = useState<boolean>(false);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState<boolean>(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false);
   const [shiftEditState, setShiftEditState] = useState<{ isOpen: boolean; assignment: ShiftAssignment | null }>({
     isOpen: false,
     assignment: null,
@@ -521,6 +525,48 @@ export default function App() {
     }
   };
 
+  const handleUpdateStaffHourlyRate = (userId: string, newRate: number) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === userId) {
+          const updated = { ...u, hourlyRate: newRate };
+          saveUserToFirestore(updated);
+          return updated;
+        }
+        return u;
+      })
+    );
+    if (currentUser?.id === userId) {
+      setCurrentUser((prev) => (prev ? { ...prev, hourlyRate: newRate } : null));
+    }
+  };
+
+  const handleAddStaff = (newStaff: User) => {
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === newStaff.id);
+      if (exists) {
+        return prev.map((u) => (u.id === newStaff.id ? newStaff : u));
+      }
+      return [...prev, newStaff];
+    });
+    saveUserToFirestore(newStaff);
+  };
+
+  const handleDeleteStaff = (userId: string) => {
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    deleteUserFromFirestore(userId);
+  };
+
+  const handleUpdateAvatar = (newAvatarUrl: string) => {
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, avatar: newAvatarUrl };
+    setCurrentUser(updatedUser);
+    setUsers((prev) =>
+      prev.map((u) => (u.id === currentUser.id ? updatedUser : u))
+    );
+    saveUserToFirestore(updatedUser);
+  };
+
   const handleSaveStaffRegistrations = (newRegs: ShiftRegistration[]) => {
     setRegistrations(newRegs);
     if (currentUser) {
@@ -564,6 +610,7 @@ export default function App() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        onOpenAvatarModal={() => setIsAvatarModalOpen(true)}
       />
 
       {/* Main Content Workspace */}
@@ -588,6 +635,7 @@ export default function App() {
           currentDeviceId={currentDeviceId}
           onChangeDeviceId={handleChangeDeviceId}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+          onOpenAvatarModal={() => setIsAvatarModalOpen(true)}
         />
 
         {/* Scrollable View Container */}
@@ -612,6 +660,19 @@ export default function App() {
                   onNavigateTab={(tab) => setActiveTab(tab)}
                   onOpenAutoSchedule={() => setIsAutoScheduleModalOpen(true)}
                   onOpenWifiModal={() => setIsWifiModalOpen(true)}
+                />
+              )}
+
+              {activeTab === 'staff_mgmt' && (
+                <ManagerStaffView
+                  allStaff={users}
+                  branches={branches}
+                  activeBranchId={activeBranchId}
+                  onAddStaff={handleAddStaff}
+                  onDeleteStaff={handleDeleteStaff}
+                  onUpdateStaffHourlyRate={handleUpdateStaffHourlyRate}
+                  onReassignStaffBranch={handleReassignStaffBranch}
+                  onResetStaffDevice={handleResetDevice}
                 />
               )}
 
@@ -652,6 +713,7 @@ export default function App() {
                   branches={branches}
                   activeBranchId={activeBranchId}
                   onSelectBranch={handleSelectBranch}
+                  onUpdateStaffHourlyRate={handleUpdateStaffHourlyRate}
                 />
               )}
             </>
@@ -674,6 +736,7 @@ export default function App() {
                   branches={branches}
                   onOpenCheckInModal={() => setIsCheckInModalOpen(true)}
                   onNavigateTab={(tab) => setActiveTab(tab)}
+                  onUpdateAvatar={handleUpdateAvatar}
                 />
               )}
 
@@ -755,6 +818,9 @@ export default function App() {
         allStaff={users}
         onReassignStaffBranch={handleReassignStaffBranch}
         onPinWifi={handlePinWifi}
+        onUpdateStaffHourlyRate={handleUpdateStaffHourlyRate}
+        onAddStaff={handleAddStaff}
+        onDeleteStaff={handleDeleteStaff}
       />
 
       {/* 3. Auto Schedule Modal */}
@@ -806,6 +872,16 @@ export default function App() {
         onCheckInSuccess={handleCheckInSuccess}
         onCheckOutSuccess={handleCheckOutSuccess}
       />
+
+      {/* 7. Avatar Modal */}
+      {isAvatarModalOpen && currentUser && (
+        <AvatarModal
+          isOpen={isAvatarModalOpen}
+          onClose={() => setIsAvatarModalOpen(false)}
+          currentUser={currentUser}
+          onSaveAvatar={handleUpdateAvatar}
+        />
+      )}
     </div>
   );
 }

@@ -160,6 +160,15 @@ export async function saveUserToFirestore(user: User): Promise<void> {
   }
 }
 
+export async function deleteUserFromFirestore(userId: string): Promise<void> {
+  try {
+    const ref = doc(db, COLLECTIONS.USERS, userId);
+    await deleteDoc(ref);
+  } catch (err) {
+    console.error('Error deleting user from Firestore:', err);
+  }
+}
+
 export async function saveBranchToFirestore(branch: Branch): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.BRANCHES, branch.id);

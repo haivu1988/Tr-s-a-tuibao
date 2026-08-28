@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   User, 
   ShiftAssignment, 
@@ -25,10 +25,14 @@ import {
   Check,
   Building2,
   Pin,
-  Wifi
+  Wifi,
+  Camera,
+  User as UserIcon,
+  Sparkles
 } from 'lucide-react';
 import { validateDeviceForUser, validateWifi } from '../../utils/deviceWifi';
 import { getSolarDateDetailFromDate, formatSolarDateWithWeekday } from '../../utils/solarCalendar';
+import { AvatarModal } from './AvatarModal';
 
 interface StaffDashboardViewProps {
   currentUser: User;
@@ -43,6 +47,7 @@ interface StaffDashboardViewProps {
   branches?: Branch[];
   onOpenCheckInModal: () => void;
   onNavigateTab: (tab: string) => void;
+  onUpdateAvatar?: (newAvatarUrl: string) => void;
 }
 
 export const StaffDashboardView: React.FC<StaffDashboardViewProps> = ({
@@ -58,7 +63,10 @@ export const StaffDashboardView: React.FC<StaffDashboardViewProps> = ({
   branches = [],
   onOpenCheckInModal,
   onNavigateTab,
+  onUpdateAvatar,
 }) => {
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false);
+
   const currentBranch = branches.find((b) => b.id === currentUser.branchId) || branches[0] || {
     id: 'cn_quan1',
     name: 'Chi Nhánh 1 - Quận 1 (Nguyễn Huệ)',
@@ -109,21 +117,53 @@ export const StaffDashboardView: React.FC<StaffDashboardViewProps> = ({
       {/* Hero Banner with Shift Status & Quick Check-in Button */}
       <div className="bg-gradient-to-r from-emerald-900 via-slate-900 to-slate-900 text-white rounded-2xl p-6 shadow-lg border border-emerald-800/40 relative overflow-hidden">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
-              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{currentBranch.name}</span>
+          <div className="flex items-start sm:items-center space-x-4">
+            {/* User Avatar with interactive change button */}
+            <div className="relative group shrink-0">
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/80 shadow-md ring-4 ring-white/10"
+              />
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                title="Thay đổi ảnh đại diện"
+                className="absolute -bottom-1.5 -right-1.5 p-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl shadow-md transition-transform hover:scale-110 cursor-pointer flex items-center justify-center"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <h2 className="text-2xl font-black text-white">
-              Chào {currentUser.name}!
-            </h2>
-            <p className="text-xs text-slate-300 flex items-center space-x-2">
-              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Hôm nay: <strong className="text-white">{solarDateInfo.formattedFull}</strong></span>
-            </p>
-            <div className="text-xs text-slate-300 flex items-center space-x-2">
-              <Pin className="w-3.5 h-3.5 text-emerald-400" />
-              <span>WiFi chấm công đã ghim: <strong className="text-emerald-300 font-mono">{currentBranch.pinnedWifiSsid}</strong></span>
+
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
+                  <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{currentBranch.name}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarModalOpen(true)}
+                  className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition-colors cursor-pointer border border-white/10"
+                >
+                  <Camera className="w-3 h-3 text-emerald-300" />
+                  <span>Đổi Avatar</span>
+                </button>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                Chào {currentUser.name}!
+              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-xs text-slate-300">
+                <p className="flex items-center space-x-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Hôm nay: <strong className="text-white">{solarDateInfo.formattedFull}</strong></span>
+                </p>
+                <p className="flex items-center space-x-1.5">
+                  <Pin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>WiFi: <strong className="text-emerald-300 font-mono">{currentBranch.pinnedWifiSsid}</strong></span>
+                </p>
+              </div>
             </div>
           </div>
 
@@ -367,27 +407,49 @@ export const StaffDashboardView: React.FC<StaffDashboardViewProps> = ({
             </button>
           </div>
 
-          {/* Action 2: Bảng công & Lương */}
+          {/* Action 3: Đổi ảnh đại diện */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <DollarSign className="w-5 h-5" />
+            <div className="flex items-center space-x-3">
+              <img
+                src={currentUser.avatar}
+                alt="Avatar"
+                className="w-10 h-10 rounded-xl object-cover border border-slate-200"
+              />
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">Hồ Sơ & Ảnh Đại Diện</h4>
+                <p className="text-[11px] text-slate-500">
+                  {currentUser.department || 'Nhân viên'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-bold text-slate-900 text-sm">Bảng Lương & Lịch Sử Công</h4>
-              <p className="text-xs text-slate-500 mt-1">
-                Xem lại lịch sử check-in, số giờ làm và tải file thống kê thu nhập.
-              </p>
-            </div>
+            <p className="text-xs text-slate-500">
+              Tùy chỉnh ảnh đại diện cá nhân hoặc tải ảnh chân dung mới từ thiết bị.
+            </p>
             <button
-              onClick={() => onNavigateTab('staff_reports')}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
+              type="button"
+              onClick={() => setIsAvatarModalOpen(true)}
+              className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
             >
-              <span>Xem Báo Cáo Thu Nhập</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <Camera className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Đổi Ảnh Đại Diện</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Avatar Modal */}
+      {isAvatarModalOpen && (
+        <AvatarModal
+          isOpen={isAvatarModalOpen}
+          onClose={() => setIsAvatarModalOpen(false)}
+          currentUser={currentUser}
+          onSaveAvatar={(newAvatarUrl) => {
+            if (onUpdateAvatar) {
+              onUpdateAvatar(newAvatarUrl);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

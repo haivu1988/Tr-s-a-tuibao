@@ -6,9 +6,11 @@ import {
   Clock, 
   Users, 
   Building2, 
-  Calendar 
+  Calendar,
+  Edit2
 } from 'lucide-react';
 import { getSolarWeekRangeText } from '../../utils/solarCalendar';
+import { EditSalaryModal } from './EditSalaryModal';
 
 interface ManagerReportsViewProps {
   weekId: string;
@@ -18,6 +20,7 @@ interface ManagerReportsViewProps {
   allStaff: User[];
   assignments: ShiftAssignment[];
   attendanceLogs: AttendanceRecord[];
+  onUpdateStaffHourlyRate?: (userId: string, newRate: number) => void;
 }
 
 export const ManagerReportsView: React.FC<ManagerReportsViewProps> = ({
@@ -28,8 +31,10 @@ export const ManagerReportsView: React.FC<ManagerReportsViewProps> = ({
   allStaff = [],
   assignments = [],
   attendanceLogs = [],
+  onUpdateStaffHourlyRate,
 }) => {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>(activeBranchId);
+  const [editingStaffSalary, setEditingStaffSalary] = useState<User | null>(null);
   const solarRange = getSolarWeekRangeText(weekId);
 
   const staffOnly = allStaff.filter((s) => {
@@ -242,8 +247,22 @@ export const ManagerReportsView: React.FC<ManagerReportsViewProps> = ({
                       </span>
                     </td>
 
-                    <td className="py-3 px-3 text-right font-mono text-slate-700">
-                      {item.staff.hourlyRate.toLocaleString('vi-VN')} đ
+                    <td className="py-3 px-3 text-right">
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <span className="font-mono font-bold text-slate-700">
+                          {item.staff.hourlyRate.toLocaleString('vi-VN')} đ
+                        </span>
+                        {onUpdateStaffHourlyRate && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingStaffSalary(item.staff)}
+                            title="Điều chỉnh mức lương cho nhân viên này"
+                            className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3 px-3 text-center">
@@ -293,6 +312,21 @@ export const ManagerReportsView: React.FC<ManagerReportsViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Edit Salary Modal */}
+      {editingStaffSalary && (
+        <EditSalaryModal
+          isOpen={!!editingStaffSalary}
+          onClose={() => setEditingStaffSalary(null)}
+          staff={editingStaffSalary}
+          branchName={branches.find((b) => b.id === editingStaffSalary.branchId)?.name}
+          onSaveRate={(userId, newRate) => {
+            if (onUpdateStaffHourlyRate) {
+              onUpdateStaffHourlyRate(userId, newRate);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

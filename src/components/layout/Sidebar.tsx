@@ -13,7 +13,9 @@ import {
   Pin,
   X,
   Building2,
-  ChevronRight
+  ChevronRight,
+  Users,
+  Camera
 } from 'lucide-react';
 import { User, Branch, WifiStoreConfig } from '../../types';
 
@@ -33,6 +35,7 @@ interface SidebarProps {
   onOpenAuth: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onOpenAvatarModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -51,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAuth,
   isMobileOpen = false,
   onCloseMobile,
+  onOpenAvatarModal,
 }) => {
   const isManager = currentUser?.role === 'manager';
   const currentBranch = branches?.find((b) => b.id === (isManager ? activeBranchId : currentUser?.branchId)) || branches?.[0] || {
@@ -62,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const managerNavItems = [
     { id: 'dashboard', label: 'Bảng Điều Khiển', icon: LayoutDashboard },
+    { id: 'staff_mgmt', label: 'Quản Lý Nhân Viên', icon: Users },
     { id: 'schedule', label: 'Lịch & Xếp Ca (Dương Lịch)', icon: CalendarDays },
     { id: 'attendance', label: 'Chấm Công & Thiết Bị', icon: Clock },
     { id: 'reports', label: 'Báo Cáo & Tính Lương', icon: BarChart3 },
@@ -243,18 +248,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* User Profile Card / Auth Button */}
           {currentUser ? (
             <div className="flex items-center justify-between p-2 bg-slate-800/60 rounded-xl border border-slate-700/60">
-              <div className="flex items-center space-x-2.5 min-w-0">
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-7 h-7 rounded-full object-cover border border-slate-600 shrink-0"
-                />
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-white truncate">
-                    {currentUser.name}
+              <div 
+                onClick={() => {
+                  if (onOpenAvatarModal) onOpenAvatarModal();
+                }}
+                title="Nhấn để đổi ảnh đại diện"
+                className="flex items-center space-x-2.5 min-w-0 cursor-pointer group flex-1"
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="w-8 h-8 rounded-full object-cover border border-slate-600 group-hover:border-emerald-400 transition-colors shrink-0"
+                  />
+                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-slate-950 p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="w-2.5 h-2.5" />
                   </div>
-                  <div className="text-[10px] text-slate-400 truncate">
-                    {isManager ? 'Quản lý cửa hàng' : currentBranch?.shortName}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors truncate flex items-center space-x-1">
+                    <span className="truncate">{currentUser.name}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate flex items-center space-x-1">
+                    <span>{isManager ? 'Quản lý cửa hàng' : currentBranch?.shortName}</span>
+                    <span className="text-[9px] text-emerald-400/80 hover:underline">(Đổi ảnh)</span>
                   </div>
                 </div>
               </div>
@@ -262,7 +279,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onLogout}
                 title="Đăng xuất / Đổi tài khoản"
-                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
               >
                 <LogOut className="w-4 h-4" />
               </button>

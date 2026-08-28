@@ -171,7 +171,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       branchId: regBranchId || 'branch_q1',
       avatar: randomAvatars[Math.floor(Math.random() * randomAvatars.length)],
       registeredDeviceId: null, // Sẽ tự động khóa mã máy trong lần đầu Check-in qua WiFi
-      hourlyRate: 28000, // Mặc định 28.000đ/giờ
+      hourlyRate: 22000, // Mặc định 22.000đ/giờ (22k VND)
       department: 'Nhân viên Part-time',
       status: 'active',
     };

@@ -386,7 +386,25 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
                 </div>
               </button>
 
-              {/* Button 3: Branch Management */}
+              {/* Button 3: Staff Management */}
+              <button
+                onClick={() => onNavigateTab('staff_mgmt')}
+                className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left flex items-center space-x-3 transition-colors cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900">
+                    Quản Lý & Thêm / Xóa Nhân Viên
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Thêm nhân viên mới, xóa nhân sự, chỉnh sửa lương theo giờ
+                  </div>
+                </div>
+              </button>
+
+              {/* Button 4: Branch Management */}
               <button
                 onClick={onOpenBranchModal}
                 className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left flex items-center space-x-3 transition-colors cursor-pointer"

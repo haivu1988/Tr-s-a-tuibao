@@ -37,6 +37,7 @@ interface HeaderProps {
   currentDeviceId: string;
   onChangeDeviceId: (newId: string) => void;
   onOpenMobileSidebar?: () => void;
+  onOpenAvatarModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -58,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentDeviceId,
   onChangeDeviceId,
   onOpenMobileSidebar,
+  onOpenAvatarModal,
 }) => {
   const [time, setTime] = useState<string>('');
   const [solarDateStr, setSolarDateStr] = useState<string>('');
@@ -110,11 +112,20 @@ export const Header: React.FC<HeaderProps> = ({
         {/* User Identity */}
         <div className="flex items-center space-x-2 min-w-0">
           {currentUser?.avatar && (
-            <img 
-              src={currentUser.avatar} 
-              alt={currentUser.name} 
-              className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0 md:hidden"
-            />
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenAvatarModal) onOpenAvatarModal();
+              }}
+              title="Đổi ảnh đại diện"
+              className="relative group shrink-0 md:hidden cursor-pointer"
+            >
+              <img 
+                src={currentUser.avatar} 
+                alt={currentUser.name} 
+                className="w-8 h-8 rounded-full object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-emerald-500"
+              />
+            </button>
           )}
           <div className="min-w-0">
             <h2 className="text-xs sm:text-base font-bold text-slate-800 truncate flex items-center space-x-1.5">
