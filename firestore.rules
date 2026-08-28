@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Branches collection
+    match /branches/{branchId} {
+      allow read, write: if true;
+    }
+
+    // Users & Staff collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Shift Registrations by staff
+    match /shift_registrations/{registrationId} {
+      allow read, write: if true;
+    }
+
+    // Shift Assignments by manager
+    match /shift_assignments/{assignmentId} {
+      allow read, write: if true;
+    }
+
+    // Attendance records (Check-in/Check-out logs)
+    match /attendance_records/{recordId} {
+      allow read, write: if true;
+    }
+
+    // System settings & configs
+    match /system_settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Fallback rule
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

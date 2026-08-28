@@ -1,0 +1,6 @@
+{
+  "name": "PartFlow Pro - Quản lý Nhân viên Part-time",
+  "description": "Hệ thống quản lý nhân viên part-time đa chi nhánh: chấm công WiFi ghim theo từng chi nhánh & Mã thiết bị (Device ID), tự động chia ca 3 ca/ngày theo Dương Lịch, duyệt ca, và báo cáo công.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "Branch": {
+      "title": "Branch",
+      "description": "Chi nhánh cửa hàng với IP WiFi và SSID",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "shortName": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "pinnedWifiIp": { "type": "string" },
+        "pinnedWifiSsid": { "type": "string" },
+        "allowedWifiIps": { "type": "array", "items": { "type": "string" } },
+        "availableWifis": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["id", "name", "pinnedWifiIp", "pinnedWifiSsid"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Tài khoản nhân viên hoặc quản lý",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["manager", "staff"] },
+        "branchId": { "type": "string" },
+        "registeredDeviceId": { "type": ["string", "null"] },
+        "hourlyRate": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["id", "name", "role", "branchId"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Bản ghi chấm công có kiểm tra IP và Device ID",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "branchId": { "type": "string" },
+        "date": { "type": "string" },
+        "day": { "type": "string" },
+        "shiftType": { "type": "string" },
+        "checkInTime": { "type": "string" },
+        "checkOutTime": { "type": ["string", "null"] },
+        "wifiIp": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "isDeviceIdValid": { "type": "boolean" },
+        "isWifiValid": { "type": "boolean" },
+        "isIpValid": { "type": "boolean" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "userId", "branchId", "date", "shiftType", "checkInTime"]
+    }
+  }
+}
