@@ -100,72 +100,106 @@ export async function initializeFirestoreDefaults(): Promise<void> {
   }
 }
 
-// ----------------- Real-time Firestore Listeners ----------------- //
+// ----------------- Real-time Firestore Listeners with Graceful Quota Handling ----------------- //
+
+function handleFirestoreError(context: string, err: any) {
+  const errMsg = err?.message || String(err);
+  if (errMsg.includes('Quota limit exceeded') || errMsg.includes('resource-exhausted')) {
+    console.warn(`[Firestore Offline Cache Active] ${context}: Quota reached, using local storage cache seamlessly.`);
+  } else {
+    console.warn(`[Firestore Notice] ${context}:`, errMsg);
+  }
+}
 
 export function subscribeBranches(callback: (branches: Branch[]) => void) {
-  const q = collection(db, COLLECTIONS.BRANCHES);
-  return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const items: Branch[] = [];
-      snapshot.forEach((d) => items.push(d.data() as Branch));
-      callback(items);
-    } else {
-      // If collection empty on fresh DB, trigger seed
-      initializeFirestoreDefaults();
-    }
-  }, (err) => {
-    console.error('Error listening to branches:', err);
-  });
+  try {
+    const q = collection(db, COLLECTIONS.BRANCHES);
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const items: Branch[] = [];
+        snapshot.forEach((d) => items.push(d.data() as Branch));
+        callback(items);
+      } else {
+        // If collection empty on fresh DB, trigger seed
+        initializeFirestoreDefaults();
+      }
+    }, (err) => {
+      handleFirestoreError('Listening to branches', err);
+    });
+  } catch (err) {
+    handleFirestoreError('Setup branches listener', err);
+    return () => {};
+  }
 }
 
 export function subscribeUsers(callback: (users: User[]) => void) {
-  const q = collection(db, COLLECTIONS.USERS);
-  return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const items: User[] = [];
-      snapshot.forEach((d) => items.push(d.data() as User));
-      callback(items);
-    } else {
-      initializeFirestoreDefaults();
-    }
-  }, (err) => {
-    console.error('Error listening to users:', err);
-  });
+  try {
+    const q = collection(db, COLLECTIONS.USERS);
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const items: User[] = [];
+        snapshot.forEach((d) => items.push(d.data() as User));
+        callback(items);
+      } else {
+        initializeFirestoreDefaults();
+      }
+    }, (err) => {
+      handleFirestoreError('Listening to users', err);
+    });
+  } catch (err) {
+    handleFirestoreError('Setup users listener', err);
+    return () => {};
+  }
 }
 
 export function subscribeRegistrations(callback: (regs: ShiftRegistration[]) => void) {
-  const q = collection(db, COLLECTIONS.REGISTRATIONS);
-  return onSnapshot(q, (snapshot) => {
-    const items: ShiftRegistration[] = [];
-    snapshot.forEach((d) => items.push(d.data() as ShiftRegistration));
-    callback(items);
-  }, (err) => {
-    console.error('Error listening to shift registrations:', err);
-  });
+  try {
+    const q = collection(db, COLLECTIONS.REGISTRATIONS);
+    return onSnapshot(q, (snapshot) => {
+      const items: ShiftRegistration[] = [];
+      snapshot.forEach((d) => items.push(d.data() as ShiftRegistration));
+      callback(items);
+    }, (err) => {
+      handleFirestoreError('Listening to shift registrations', err);
+    });
+  } catch (err) {
+    handleFirestoreError('Setup registrations listener', err);
+    return () => {};
+  }
 }
 
 export function subscribeAssignments(callback: (assignments: ShiftAssignment[]) => void) {
-  const q = collection(db, COLLECTIONS.ASSIGNMENTS);
-  return onSnapshot(q, (snapshot) => {
-    const items: ShiftAssignment[] = [];
-    snapshot.forEach((d) => items.push(d.data() as ShiftAssignment));
-    callback(items);
-  }, (err) => {
-    console.error('Error listening to shift assignments:', err);
-  });
+  try {
+    const q = collection(db, COLLECTIONS.ASSIGNMENTS);
+    return onSnapshot(q, (snapshot) => {
+      const items: ShiftAssignment[] = [];
+      snapshot.forEach((d) => items.push(d.data() as ShiftAssignment));
+      callback(items);
+    }, (err) => {
+      handleFirestoreError('Listening to shift assignments', err);
+    });
+  } catch (err) {
+    handleFirestoreError('Setup assignments listener', err);
+    return () => {};
+  }
 }
 
 export function subscribeAttendance(callback: (logs: AttendanceRecord[]) => void) {
-  const q = collection(db, COLLECTIONS.ATTENDANCE);
-  return onSnapshot(q, (snapshot) => {
-    const items: AttendanceRecord[] = [];
-    snapshot.forEach((d) => items.push(d.data() as AttendanceRecord));
-    // Sort descending by date & checkInTime
-    items.sort((a, b) => (b.date + (b.checkInTime || '')).localeCompare(a.date + (a.checkInTime || '')));
-    callback(items);
-  }, (err) => {
-    console.error('Error listening to attendance logs:', err);
-  });
+  try {
+    const q = collection(db, COLLECTIONS.ATTENDANCE);
+    return onSnapshot(q, (snapshot) => {
+      const items: AttendanceRecord[] = [];
+      snapshot.forEach((d) => items.push(d.data() as AttendanceRecord));
+      // Sort descending by date & checkInTime
+      items.sort((a, b) => (b.date + (b.checkInTime || '')).localeCompare(a.date + (a.checkInTime || '')));
+      callback(items);
+    }, (err) => {
+      handleFirestoreError('Listening to attendance logs', err);
+    });
+  } catch (err) {
+    handleFirestoreError('Setup attendance listener', err);
+    return () => {};
+  }
 }
 
 // ----------------- CRUD Mutators for Firestore ----------------- //
@@ -175,7 +209,7 @@ export async function saveUserToFirestore(user: User): Promise<void> {
     const ref = doc(db, COLLECTIONS.USERS, user.id);
     await setDoc(ref, cleanFirestoreData(user), { merge: true });
   } catch (err) {
-    console.error('Error saving user to Firestore:', err);
+    handleFirestoreError('Save user to Firestore', err);
   }
 }
 
@@ -184,7 +218,7 @@ export async function deleteUserFromFirestore(userId: string): Promise<void> {
     const ref = doc(db, COLLECTIONS.USERS, userId);
     await deleteDoc(ref);
   } catch (err) {
-    console.error('Error deleting user from Firestore:', err);
+    handleFirestoreError('Delete user from Firestore', err);
   }
 }
 
@@ -193,7 +227,7 @@ export async function saveBranchToFirestore(branch: Branch): Promise<void> {
     const ref = doc(db, COLLECTIONS.BRANCHES, branch.id);
     await setDoc(ref, cleanFirestoreData(branch), { merge: true });
   } catch (err) {
-    console.error('Error saving branch to Firestore:', err);
+    handleFirestoreError('Save branch to Firestore', err);
   }
 }
 
@@ -202,7 +236,7 @@ export async function deleteBranchFromFirestore(branchId: string): Promise<void>
     const ref = doc(db, COLLECTIONS.BRANCHES, branchId);
     await deleteDoc(ref);
   } catch (err) {
-    console.error('Error deleting branch from Firestore:', err);
+    handleFirestoreError('Delete branch from Firestore', err);
   }
 }
 
@@ -211,7 +245,7 @@ export async function saveShiftRegistrationToFirestore(registration: ShiftRegist
     const ref = doc(db, COLLECTIONS.REGISTRATIONS, registration.id);
     await setDoc(ref, cleanFirestoreData(registration), { merge: true });
   } catch (err) {
-    console.error('Error saving shift registration:', err);
+    handleFirestoreError('Save shift registration to Firestore', err);
   }
 }
 
@@ -236,7 +270,7 @@ export async function saveBatchRegistrationsToFirestore(userId: string, weekId: 
     }
     await batch.commit();
   } catch (err) {
-    console.error('Error saving batch registrations:', err);
+    handleFirestoreError('Save batch registrations to Firestore', err);
   }
 }
 
@@ -246,7 +280,7 @@ export async function saveShiftAssignmentToFirestore(assignment: ShiftAssignment
     const ref = doc(db, COLLECTIONS.ASSIGNMENTS, docId);
     await setDoc(ref, cleanFirestoreData({ ...assignment, id: docId }), { merge: true });
   } catch (err) {
-    console.error('Error saving shift assignment:', err);
+    handleFirestoreError('Save shift assignment to Firestore', err);
   }
 }
 
@@ -260,7 +294,7 @@ export async function saveBatchAssignmentsToFirestore(assignments: ShiftAssignme
     }
     await batch.commit();
   } catch (err) {
-    console.error('Error batch saving assignments:', err);
+    handleFirestoreError('Save batch assignments to Firestore', err);
   }
 }
 
@@ -269,7 +303,7 @@ export async function saveAttendanceRecordToFirestore(record: AttendanceRecord):
     const ref = doc(db, COLLECTIONS.ATTENDANCE, record.id);
     await setDoc(ref, cleanFirestoreData(record), { merge: true });
   } catch (err) {
-    console.error('Error saving attendance record:', err);
+    handleFirestoreError('Save attendance record to Firestore', err);
   }
 }
 
@@ -278,19 +312,24 @@ export async function updateAttendanceRecordInFirestore(recordId: string, update
     const ref = doc(db, COLLECTIONS.ATTENDANCE, recordId);
     await updateDoc(ref, cleanFirestoreData(updates));
   } catch (err) {
-    console.error('Error updating attendance record:', err);
+    handleFirestoreError('Update attendance record in Firestore', err);
   }
 }
 
 export function subscribeRegistrationControls(callback: (controls: RegistrationWeekControl[]) => void) {
-  const q = collection(db, COLLECTIONS.REGISTRATION_CONTROLS);
-  return onSnapshot(q, (snapshot) => {
-    const items: RegistrationWeekControl[] = [];
-    snapshot.forEach((d) => items.push(d.data() as RegistrationWeekControl));
-    callback(items);
-  }, (err) => {
-    console.error('Error listening to registration controls:', err);
-  });
+  try {
+    const q = collection(db, COLLECTIONS.REGISTRATION_CONTROLS);
+    return onSnapshot(q, (snapshot) => {
+      const items: RegistrationWeekControl[] = [];
+      snapshot.forEach((d) => items.push(d.data() as RegistrationWeekControl));
+      callback(items);
+    }, (err) => {
+      handleFirestoreError('Listening to registration controls', err);
+    });
+  } catch (err) {
+    handleFirestoreError('Setup registration controls listener', err);
+    return () => {};
+  }
 }
 
 export async function saveRegistrationWeekControlToFirestore(control: RegistrationWeekControl): Promise<void> {
@@ -298,6 +337,6 @@ export async function saveRegistrationWeekControlToFirestore(control: Registrati
     const ref = doc(db, COLLECTIONS.REGISTRATION_CONTROLS, control.weekId);
     await setDoc(ref, cleanFirestoreData(control), { merge: true });
   } catch (err) {
-    console.error('Error saving registration week control:', err);
+    handleFirestoreError('Save registration week control to Firestore', err);
   }
 }

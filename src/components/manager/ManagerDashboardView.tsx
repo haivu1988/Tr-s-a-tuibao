@@ -6,8 +6,7 @@ import {
   ShiftRegistration, 
   WifiStoreConfig, 
   Branch, 
-  SHIFT_DEFINITIONS,
-  RegistrationWeekControl
+  SHIFT_DEFINITIONS
 } from '../../types';
 import { 
   Users, 
@@ -21,8 +20,6 @@ import {
   ChevronRight, 
   Calendar,
   Layers,
-  Lock,
-  Unlock,
   CheckCircle2
 } from 'lucide-react';
 import { 
@@ -47,8 +44,6 @@ interface ManagerDashboardViewProps {
   onNavigateTab: (tab: string) => void;
   onOpenAutoSchedule: () => void;
   onOpenWifiModal: () => void;
-  registrationControls?: RegistrationWeekControl[];
-  onToggleRegistrationWeek?: (weekId: string, isOpen: boolean) => void;
 }
 
 export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
@@ -66,8 +61,6 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
   onNavigateTab,
   onOpenAutoSchedule,
   onOpenWifiModal,
-  registrationControls = [],
-  onToggleRegistrationWeek,
 }) => {
   const currentBranch = branches?.find((b) => b.id === activeBranchId) || branches?.[0] || {
     id: 'cn_quan1',
@@ -89,10 +82,6 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
 
   // Registered staff count
   const registeredStaffCount = Array.from(new Set(branchRegistrations.map((r) => r.userId))).length;
-
-  // Registration control status for current week
-  const currentWeekControl = registrationControls.find((c) => c.weekId === weekId);
-  const isRegistrationOpen = currentWeekControl ? currentWeekControl.isOpen : false;
 
   // Today Solar Date
   const todayDateStr = new Date().toISOString().split('T')[0];
@@ -168,81 +157,6 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
             </button>
           </div>
         </div>
-      </div>
-
-      {/* REGISTRATION GATE CONTROL BANNER FOR MANAGERS (QUẢN LÝ MỞ / ĐÓNG CA) */}
-      <div
-        className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs ${
-          isRegistrationOpen
-            ? 'bg-gradient-to-r from-emerald-50 to-teal-50/60 border-emerald-300 ring-1 ring-emerald-400/30'
-            : 'bg-gradient-to-r from-slate-50 to-amber-50/40 border-slate-300'
-        }`}
-      >
-        <div className="flex items-start sm:items-center space-x-3.5">
-          <div
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
-              isRegistrationOpen
-                ? 'bg-emerald-600 text-white shadow-emerald-200'
-                : 'bg-slate-200 text-slate-600'
-            }`}
-          >
-            {isRegistrationOpen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-          </div>
-
-          <div>
-            <div className="flex items-center space-x-2.5">
-              <span className="font-black text-sm sm:text-base text-slate-900">
-                Cổng Đăng Ký Ca Tuần ({getSolarWeekRangeText(weekId)})
-              </span>
-              <span
-                className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex items-center space-x-1 ${
-                  isRegistrationOpen
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                    : 'bg-rose-100 text-rose-800 border-rose-300'
-                }`}
-              >
-                <span>{isRegistrationOpen ? '🟢 Đang Mở Đăng Ký' : '🔒 Đang Khóa / Đóng'}</span>
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              {isRegistrationOpen ? (
-                <>
-                  <span className="text-emerald-800 font-semibold">Nhân viên đang được phép đăng ký cả 3 ca/ngày.</span> Đã có <strong className="text-slate-900">{registeredStaffCount}/{branchStaff.length}</strong> nhân sự gửi nguyện vọng (<strong className="text-slate-900">{branchRegistrations.length} lượt ca</strong>).
-                </>
-              ) : (
-                <>
-                  Cổng đăng ký ca đang <strong className="text-rose-700">ĐÓNG</strong>. Nhân viên không thể gửi hay sửa nguyện vọng cho tuần này. Bấm nút bên cạnh để mở cổng cho nhân viên đăng ký.
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-
-        {/* Action Toggle Button */}
-        {onToggleRegistrationWeek && (
-          <div className="flex items-center space-x-2 shrink-0 pt-2 md:pt-0">
-            {isRegistrationOpen ? (
-              <button
-                type="button"
-                onClick={() => onToggleRegistrationWeek(weekId, false)}
-                className="w-full md:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
-              >
-                <Lock className="w-4 h-4" />
-                <span>Đóng Cổng Đăng Ký Tuần Này</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onToggleRegistrationWeek(weekId, true)}
-                className="w-full md:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer ring-2 ring-emerald-500/30"
-              >
-                <Unlock className="w-4 h-4" />
-                <span>Mở Cổng Cho Nhân Viên Đăng Ký</span>
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* KPI Cards: Scoped to this branch */}
@@ -440,34 +354,6 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
             </p>
 
             <div className="mt-4 space-y-2.5">
-              {/* Button 0: Toggle Registration Quick Button */}
-              {onToggleRegistrationWeek && (
-                <button
-                  onClick={() => onToggleRegistrationWeek(weekId, !isRegistrationOpen)}
-                  className={`w-full p-3 border rounded-xl text-left flex items-center space-x-3 transition-colors cursor-pointer ${
-                    isRegistrationOpen
-                      ? 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-950'
-                      : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-950'
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-lg text-white flex items-center justify-center shrink-0 ${
-                      isRegistrationOpen ? 'bg-rose-600' : 'bg-emerald-600'
-                    }`}
-                  >
-                    {isRegistrationOpen ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold">
-                      {isRegistrationOpen ? 'Đóng Cổng Đăng Ký Ca Tuần Này' : 'Mở Cổng Đăng Ký Ca Tuần Này'}
-                    </div>
-                    <div className={`text-[10px] ${isRegistrationOpen ? 'text-rose-700' : 'text-emerald-700'}`}>
-                      {isRegistrationOpen ? 'Khóa không cho nhân viên sửa ca' : 'Cho phép nhân viên đăng ký cả 3 ca'}
-                    </div>
-                  </div>
-                </button>
-              )}
-
               {/* Button 1: Auto Schedule for this branch */}
               <button
                 onClick={onOpenAutoSchedule}

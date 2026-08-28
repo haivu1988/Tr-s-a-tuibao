@@ -810,12 +810,6 @@ export default function App() {
                   onSelectWeek={setWeekId}
                   registrations={registrations}
                   onSaveRegistrations={handleSaveStaffRegistrations}
-                  isRegistrationOpen={
-                    registrationControls.find((c) => c.weekId === weekId)?.isOpen ?? true
-                  }
-                  registrationControl={
-                    registrationControls.find((c) => c.weekId === weekId)
-                  }
                 />
               )}
 

@@ -6,8 +6,7 @@ import {
   DayOfWeek, 
   ShiftType, 
   DAYS_OF_WEEK, 
-  SHIFT_DEFINITIONS,
-  RegistrationWeekControl
+  SHIFT_DEFINITIONS
 } from '../../types';
 import { 
   Calendar, 
@@ -16,8 +15,6 @@ import {
   CheckCircle2, 
   RotateCcw, 
   Building2, 
-  Lock, 
-  Unlock, 
   Sun, 
   Sunset, 
   Moon, 
@@ -25,8 +22,7 @@ import {
   Layers,
   LayoutList,
   CalendarDays,
-  Save,
-  AlertCircle
+  Save
 } from 'lucide-react';
 import { 
   getSolarDateInfo, 
@@ -42,8 +38,6 @@ interface StaffRegisterViewProps {
   onSelectWeek?: (weekId: string) => void;
   registrations: ShiftRegistration[];
   onSaveRegistrations: (newRegs: ShiftRegistration[]) => void;
-  isRegistrationOpen: boolean;
-  registrationControl?: RegistrationWeekControl;
 }
 
 export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
@@ -53,8 +47,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   onSelectWeek,
   registrations = [],
   onSaveRegistrations,
-  isRegistrationOpen,
-  registrationControl,
 }) => {
   const currentBranch = branches?.find((b) => b.id === currentUser.branchId) || branches?.[0] || {
     id: 'cn_quan1',
@@ -99,7 +91,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   }, [weekId, registrations, currentUser.id]);
 
   const toggleShift = (day: DayOfWeek, shiftType: ShiftType) => {
-    if (!isRegistrationOpen) return;
     const key = `${day}_${shiftType}`;
     setSelectedMap((prev) => {
       const next = {
@@ -129,7 +120,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
 
   // Toggle all 3 shifts for a specific day
   const handleToggleWholeDay = (day: DayOfWeek) => {
-    if (!isRegistrationOpen) return;
     const currentCount = getDayCount(day);
     const selectAll = currentCount < 3;
     setSelectedMap((prev) => ({
@@ -142,8 +132,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   };
 
   const handleSave = () => {
-    if (!isRegistrationOpen) return;
-
     // Keep other users' registrations, replace current user's registrations for this week
     const otherUsersRegs = registrations.filter(
       (r) => !(r.userId === currentUser.id && r.weekId === weekId)
@@ -188,13 +176,11 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   };
 
   const handleClearAll = () => {
-    if (!isRegistrationOpen) return;
     setSelectedMap({});
     setHasUnsavedChanges(true);
   };
 
   const handleSelectAllMorning = () => {
-    if (!isRegistrationOpen) return;
     const updated = { ...selectedMap };
     DAYS_OF_WEEK.forEach((d) => {
       updated[`${d.key}_morning`] = true;
@@ -204,7 +190,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   };
 
   const handleSelectAllAfternoon = () => {
-    if (!isRegistrationOpen) return;
     const updated = { ...selectedMap };
     DAYS_OF_WEEK.forEach((d) => {
       updated[`${d.key}_afternoon`] = true;
@@ -214,7 +199,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   };
 
   const handleSelectAllEvening = () => {
-    if (!isRegistrationOpen) return;
     const updated = { ...selectedMap };
     DAYS_OF_WEEK.forEach((d) => {
       updated[`${d.key}_evening`] = true;
@@ -224,7 +208,6 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
   };
 
   const handleSelectAllFullDay = () => {
-    if (!isRegistrationOpen) return;
     const updated = { ...selectedMap };
     DAYS_OF_WEEK.forEach((d) => {
       updated[`${d.key}_morning`] = true;
@@ -260,17 +243,10 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                 <h2 className="text-lg sm:text-xl font-black text-slate-800">
                   Đăng Ký Ca Làm Việc
                 </h2>
-                {isRegistrationOpen ? (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                    <Unlock className="w-3 h-3 mr-1 text-emerald-600" />
-                    Cổng Đang Mở
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                    <Lock className="w-3 h-3 mr-1 text-rose-600" />
-                    Cổng Đang Khóa
-                  </span>
-                )}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                  <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
+                  Luôn Mở Đăng Ký
+                </span>
               </div>
               <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-1">
                 <span className="font-semibold text-slate-700 flex items-center">
@@ -312,17 +288,14 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
           <button
             type="button"
             onClick={handleSave}
-            disabled={!isRegistrationOpen}
-            className={`px-4 sm:px-5 py-2 sm:py-2.5 font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center space-x-1.5 touch-manipulation select-none ${
-              isRegistrationOpen
-                ? hasUnsavedChanges
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95 ring-2 ring-emerald-400 animate-pulse'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            className={`px-4 sm:px-5 py-2 sm:py-2.5 font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center space-x-1.5 touch-manipulation select-none cursor-pointer active:scale-95 ${
+              hasUnsavedChanges
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400 animate-pulse'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
             }`}
           >
-            {isRegistrationOpen ? <Save className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-            <span>{isRegistrationOpen ? (hasUnsavedChanges ? 'Lưu Nguyện Vọng *' : 'Lưu Đăng Ký') : 'Đã Khóa'}</span>
+            <Save className="w-4 h-4" />
+            <span>{hasUnsavedChanges ? 'Lưu Nguyện Vọng *' : 'Lưu Đăng Ký'}</span>
           </button>
         </div>
       </div>
@@ -335,79 +308,63 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
         </div>
       )}
 
-      {/* Status Gate Banner */}
-      {!isRegistrationOpen ? (
-        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 sm:p-5 text-amber-900 flex items-start space-x-3.5 shadow-2xs">
-          <div className="w-10 h-10 rounded-xl bg-amber-200 text-amber-800 flex items-center justify-center shrink-0">
-            <Lock className="w-5 h-5" />
+      {/* Guidance Banner */}
+      <div className="bg-gradient-to-r from-emerald-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-start space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <div className="space-y-1">
-            <div className="font-bold text-sm sm:text-base flex items-center space-x-1.5 text-amber-950">
-              <span>Cổng Đăng Ký Ca Đang Đóng (Chỉ Xem)</span>
-            </div>
-            <p className="text-xs sm:text-sm text-amber-800 leading-relaxed">
-              Quản lý chưa mở hoặc đã đóng cổng nhận đăng ký ca cho <strong>{solarRange}</strong>. Bạn đang xem lại các ca đã đăng ký trước đó. Nếu cần đổi ca hoặc đăng ký thêm, vui lòng nhờ Quản lý mở cổng.
+          <div className="text-xs text-emerald-100 space-y-1">
+            <p className="font-bold text-white text-sm">
+              Đăng Ký Linh Hoạt — Được chọn cả 3 ca / ngày:
+            </p>
+            <p className="text-[11px] sm:text-xs text-emerald-200">
+              • Bạn có thể chọn 1, 2 hoặc <strong>cả 3 ca trong 1 ngày</strong>: Ca Sáng (08:00-13:00), Ca Chiều (13:00-18:00), Ca Tối (18:00-23:00).
             </p>
           </div>
         </div>
-      ) : (
-        <div className="bg-gradient-to-r from-emerald-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-start space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0">
-              <Unlock className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-xs text-emerald-100 space-y-1">
-              <p className="font-bold text-white text-sm">
-                Cổng Đăng Ký Đang Mở — Được chọn cả 3 ca / ngày:
-              </p>
-              <p className="text-[11px] sm:text-xs text-emerald-200">
-                • Bạn có thể đăng ký 1, 2 hoặc <strong>cả 3 ca trong 1 ngày</strong>: Ca Sáng (08:00-13:00), Ca Chiều (13:00-18:00), Ca Tối (18:00-23:00).
-              </p>
-            </div>
-          </div>
 
-          {/* Quick select helpers */}
-          <div className="flex flex-wrap gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleSelectAllMorning}
-              className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 border border-emerald-700 text-emerald-100 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center touch-manipulation active:scale-95"
-            >
-              + Ca Sáng
-            </button>
-            <button
-              type="button"
-              onClick={handleSelectAllAfternoon}
-              className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 border border-emerald-700 text-emerald-100 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center touch-manipulation active:scale-95"
-            >
-              + Ca Chiều
-            </button>
-            <button
-              type="button"
-              onClick={handleSelectAllEvening}
-              className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 border border-emerald-700 text-emerald-100 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center touch-manipulation active:scale-95"
-            >
-              + Ca Tối
-            </button>
-            <button
-              type="button"
-              onClick={handleSelectAllFullDay}
-              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 text-white text-[11px] sm:text-xs font-bold rounded-lg transition-colors cursor-pointer text-center flex items-center space-x-1 touch-manipulation active:scale-95 shadow-2xs"
-            >
-              <Layers className="w-3 h-3" />
-              <span>+ Cả 3 Ca / Ngày</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-300 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center space-x-1 touch-manipulation active:scale-95"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Xóa hết</span>
-            </button>
-          </div>
+        {/* Quick select helpers */}
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={handleSelectAllMorning}
+            className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 border border-emerald-700 text-emerald-100 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center touch-manipulation active:scale-95"
+          >
+            + Ca Sáng
+          </button>
+          <button
+            type="button"
+            onClick={handleSelectAllAfternoon}
+            className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 border border-emerald-700 text-emerald-100 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center touch-manipulation active:scale-95"
+          >
+            + Ca Chiều
+          </button>
+          <button
+            type="button"
+            onClick={handleSelectAllEvening}
+            className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 border border-emerald-700 text-emerald-100 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer text-center touch-manipulation active:scale-95"
+          >
+            + Ca Tối
+          </button>
+          <button
+            type="button"
+            onClick={handleSelectAllFullDay}
+            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 text-white text-[11px] sm:text-xs font-bold rounded-lg transition-colors cursor-pointer text-center flex items-center space-x-1 touch-manipulation active:scale-95 shadow-2xs"
+          >
+            <Layers className="w-3 h-3" />
+            <span>+ Cả 3 Ca / Ngày</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-300 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center space-x-1 touch-manipulation active:scale-95"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Xóa hết</span>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* MOBILE DISPLAY CONTROLS */}
       <div className="md:hidden space-y-3">
@@ -500,15 +457,13 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                     (Đã chọn {getDayCount(activeMobileDay)}/3 ca)
                   </span>
                 </div>
-                {isRegistrationOpen && (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleWholeDay(activeMobileDay)}
-                    className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer touch-manipulation"
-                  >
-                    {getDayCount(activeMobileDay) === 3 ? 'Bỏ chọn ngày' : '+ Chọn cả 3 ca'}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleToggleWholeDay(activeMobileDay)}
+                  className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer touch-manipulation"
+                >
+                  {getDayCount(activeMobileDay) === 3 ? 'Bỏ chọn ngày' : '+ Chọn cả 3 ca'}
+                </button>
               </div>
 
               <div className="space-y-2.5">
@@ -520,16 +475,11 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                     <button
                       key={shiftType}
                       type="button"
-                      disabled={!isRegistrationOpen}
                       onClick={() => toggleShift(activeMobileDay, shiftType)}
-                      className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between touch-manipulation select-none active:scale-[0.98] ${
-                        !isRegistrationOpen
-                          ? active
-                            ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900 cursor-not-allowed opacity-90'
-                            : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-70'
-                          : active
-                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold shadow-2xs ring-1 ring-emerald-400 cursor-pointer'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between touch-manipulation select-none active:scale-[0.98] cursor-pointer ${
+                        active
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold shadow-2xs ring-1 ring-emerald-400'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       <div className="flex items-center space-x-3">
@@ -607,15 +557,13 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                         {countOnDay === 3 ? 'Cả 3 ca' : `${countOnDay}/3 ca`}
                       </span>
 
-                      {isRegistrationOpen && (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleWholeDay(d.key)}
-                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 transition-colors touch-manipulation cursor-pointer"
-                        >
-                          {countOnDay === 3 ? 'Bỏ' : '+3 ca'}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleWholeDay(d.key)}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 transition-colors touch-manipulation cursor-pointer"
+                      >
+                        {countOnDay === 3 ? 'Bỏ' : '+3 ca'}
+                      </button>
                     </div>
                   </div>
 
@@ -629,16 +577,11 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                         <button
                           key={shiftType}
                           type="button"
-                          disabled={!isRegistrationOpen}
                           onClick={() => toggleShift(d.key, shiftType)}
-                          className={`p-2.5 rounded-xl border flex flex-col items-center justify-between text-center transition-all touch-manipulation select-none active:scale-[0.96] ${
-                            !isRegistrationOpen
-                              ? active
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 cursor-not-allowed opacity-90'
-                                : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                              : active
-                              ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold shadow-2xs ring-2 ring-emerald-400 cursor-pointer'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                          className={`p-2.5 rounded-xl border flex flex-col items-center justify-between text-center transition-all touch-manipulation select-none active:scale-[0.96] cursor-pointer ${
+                            active
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold shadow-2xs ring-2 ring-emerald-400'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                           }`}
                         >
                           <div className="flex items-center space-x-1 mb-1">
@@ -720,14 +663,9 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                     <button
                       key={shiftType}
                       type="button"
-                      disabled={!isRegistrationOpen}
                       onClick={() => toggleShift(d.key, shiftType)}
                       className={`w-full text-left p-2.5 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
-                        !isRegistrationOpen
-                          ? active
-                            ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 cursor-not-allowed opacity-90'
-                            : 'bg-slate-50/40 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                          : active
+                        active
                           ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold shadow-2xs ring-1 ring-emerald-400'
                           : 'bg-slate-50/70 border-slate-200 text-slate-600 hover:bg-slate-100/70'
                       }`}
@@ -785,15 +723,10 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
         <button
           type="button"
           onClick={handleSave}
-          disabled={!isRegistrationOpen}
-          className={`px-6 py-3 font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center space-x-2 ${
-            isRegistrationOpen
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
-              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-          }`}
+          className="px-6 py-3 font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95"
         >
-          {isRegistrationOpen ? <Save className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-          <span>{isRegistrationOpen ? `Lưu Nguyện Vọng (${currentBranch.shortName})` : 'Cổng Đăng Ký Đang Đóng'}</span>
+          <Save className="w-4 h-4" />
+          <span>Lưu Nguyện Vọng ({currentBranch.shortName})</span>
         </button>
       </div>
 
@@ -815,17 +748,14 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
         <button
           type="button"
           onClick={handleSave}
-          disabled={!isRegistrationOpen}
-          className={`px-4 py-2.5 font-black rounded-xl text-xs shadow-lg transition-all flex items-center space-x-1.5 touch-manipulation select-none shrink-0 ${
-            isRegistrationOpen
-              ? hasUnsavedChanges
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 active:scale-90 ring-2 ring-emerald-300 animate-bounce'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-90'
-              : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+          className={`px-4 py-2.5 font-black rounded-xl text-xs shadow-lg transition-all flex items-center space-x-1.5 touch-manipulation select-none shrink-0 cursor-pointer ${
+            hasUnsavedChanges
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 active:scale-90 ring-2 ring-emerald-300 animate-bounce'
+              : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-90'
           }`}
         >
-          {isRegistrationOpen ? <Check className="w-4 h-4 stroke-[3]" /> : <Lock className="w-4 h-4" />}
-          <span>{isRegistrationOpen ? (hasUnsavedChanges ? 'LƯU NGAY *' : 'Lưu Đăng Ký') : 'Đang Đóng'}</span>
+          <Check className="w-4 h-4 stroke-[3]" />
+          <span>{hasUnsavedChanges ? 'LƯU NGAY *' : 'Lưu Đăng Ký'}</span>
         </button>
       </div>
     </div>
