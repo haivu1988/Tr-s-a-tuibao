@@ -891,6 +891,7 @@ export default function App() {
         branch={branches.find((b) => b.id === (shiftEditState.assignment?.branchId || activeBranchId))}
         allStaff={users}
         allAssignments={assignments}
+        registrations={registrations}
         onSaveAssignment={handleSaveShiftAssignment}
       />
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { User, ShiftAssignment, Branch, DAYS_OF_WEEK, SHIFT_DEFINITIONS } from '../../types';
-import { X, Check, AlertTriangle, Building2, Calendar } from 'lucide-react';
+import { User, ShiftAssignment, ShiftRegistration, Branch, DAYS_OF_WEEK, SHIFT_DEFINITIONS } from '../../types';
+import { X, Check, AlertTriangle, Building2, Calendar, CheckCircle2 } from 'lucide-react';
 import { getSolarDateInfo } from '../../utils/solarCalendar';
 
 interface ShiftEditModalProps {
@@ -10,6 +10,7 @@ interface ShiftEditModalProps {
   branch?: Branch;
   allStaff: User[];
   allAssignments: ShiftAssignment[];
+  registrations?: ShiftRegistration[];
   onSaveAssignment: (updated: ShiftAssignment) => void;
 }
 
@@ -20,6 +21,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   branch,
   allStaff = [],
   allAssignments = [],
+  registrations = [],
   onSaveAssignment,
 }) => {
   if (!isOpen || !assignment) return null;
@@ -35,6 +37,19 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   // Filter staff specifically for this assignment's branch
   const branchStaff = allStaff.filter(
     (s) => s.role === 'staff' && s.status === 'active' && s.branchId === assignment.branchId
+  );
+
+  // Check which staff registered for this specific shift
+  const registeredUserIds = new Set(
+    registrations
+      .filter(
+        (r) =>
+          r.branchId === assignment.branchId &&
+          r.weekId === assignment.weekId &&
+          r.day === assignment.day &&
+          r.shiftType === assignment.shiftType
+      )
+      .map((r) => r.userId)
   );
 
   const handleToggleUser = (userId: string) => {
@@ -153,6 +168,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
               {branchStaff.length > 0 ? (
                 branchStaff.map((staff) => {
                   const isSelected = selectedUserIds.includes(staff.id);
+                  const isRegistered = registeredUserIds.has(staff.id);
                   const otherShiftsToday = getUserShiftCountOnDay(staff.id);
                   const totalShiftsToday = isSelected ? otherShiftsToday + 1 : otherShiftsToday;
 
@@ -164,7 +180,9 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
                       className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-colors cursor-pointer ${
                         isSelected
                           ? 'border-emerald-500 bg-emerald-50/60 text-emerald-950 shadow-xs'
-                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                          : isRegistered
+                          ? 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700'
+                          : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-600 opacity-90'
                       }`}
                     >
                       <div className="flex items-center space-x-3 min-w-0">
@@ -179,6 +197,16 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
                             {isSelected && (
                               <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-semibold">
                                 Trong ca
+                              </span>
+                            )}
+                            {isRegistered ? (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded font-bold flex items-center space-x-0.5">
+                                <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                                <span>Đã ĐK ca</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-medium">
+                                Chưa ĐK
                               </span>
                             )}
                           </div>

@@ -123,8 +123,8 @@ export const AutoScheduleModal: React.FC<AutoScheduleModalProps> = ({
                   3
                 </span>
                 <div>
-                  <div className="font-bold text-slate-800">Ưu tiên ca rảnh đã ĐK</div>
-                  <div className="text-slate-500 text-[11px]">Chia đều giờ làm cho nhân viên CN</div>
+                  <div className="font-bold text-slate-800">Chỉ chia ca ĐÃ ĐĂNG KÝ</div>
+                  <div className="text-slate-500 text-[11px]">Tuyệt đối không xếp ca nếu NV chưa đăng ký</div>
                 </div>
               </div>
             </div>

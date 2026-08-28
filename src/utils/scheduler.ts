@@ -29,7 +29,8 @@ export function autoScheduleWeek(
   const shiftTypes: ShiftType[] = ['morning', 'afternoon', 'evening'];
   const days: DayOfWeek[] = DAYS_OF_WEEK.map((d) => d.key);
 
-  // Map of registrations by day and shift for this branch
+  // Map of registered staff IDs by day and shift for this branch
+  // Key: `${day}_${shiftType}` -> Set of userIds who EXPLICITLY registered for this specific shift
   const regMap = new Map<string, Set<string>>();
   days.forEach((d) => {
     shiftTypes.forEach((s) => {
@@ -41,12 +42,13 @@ export function autoScheduleWeek(
     .filter((r) => r.branchId === branchId && r.weekId === weekId)
     .forEach((r) => {
       const set = regMap.get(`${r.day}_${r.shiftType}`);
-      if (set) {
+      // Only include if user is an active staff of this branch
+      if (set && activeStaff.some((s) => s.id === r.userId)) {
         set.add(r.userId);
       }
     });
 
-  // Track assignments: day -> shiftType -> string[] (userIds)
+  // Track assignments: `${day}_${shiftType}` -> string[] (userIds)
   const shiftAssignmentsMap = new Map<string, string[]>();
   // Track daily shift count per user: `${day}_${userId}` -> number
   const dailyUserShiftCount = new Map<string, number>();
@@ -71,17 +73,19 @@ export function autoScheduleWeek(
     weeklyUserShiftCount.set(userId, (weeklyUserShiftCount.get(userId) || 0) + 1);
   };
 
-  // PASS 1: Assign registered staff who currently have 0 shifts on that day (prioritize 1 shift/day)
+  // PASS 1: Assign staff who REGISTERED for this shift and currently have 0 shifts on this day (prioritize 1 shift/day)
   days.forEach((day) => {
     shiftTypes.forEach((shiftType) => {
-      const regSet = regMap.get(`${day}_${shiftType}`) || new Set();
-      const currentAssigned = shiftAssignmentsMap.get(`${day}_${shiftType}`) || [];
+      const key = `${day}_${shiftType}`;
+      const regSet = regMap.get(key) || new Set();
+      const currentAssigned = shiftAssignmentsMap.get(key) || [];
 
+      // Only candidate users who registered for this exact day & shift
       const candidates = Array.from(regSet)
         .filter((userId) => !currentAssigned.includes(userId) && getDailyCount(day, userId) === 0)
         .sort((a, b) => (weeklyUserShiftCount.get(a) || 0) - (weeklyUserShiftCount.get(b) || 0));
 
-      while (candidates.length > 0 && (shiftAssignmentsMap.get(`${day}_${shiftType}`) || []).length < targetStaffPerShift) {
+      while (candidates.length > 0 && (shiftAssignmentsMap.get(key) || []).length < targetStaffPerShift) {
         const nextUser = candidates.shift();
         if (nextUser) {
           incrementUserShift(day, shiftType, nextUser);
@@ -90,13 +94,14 @@ export function autoScheduleWeek(
     });
   });
 
-  // PASS 2: If any shift still has < targetStaffPerShift, check registered staff who have 1 shift today (allow max 2 shifts/day, NEVER 3)
+  // PASS 2: If shift still needs staff, assign staff who REGISTERED for this shift and have 1 shift today (allow max 2 shifts/day, NEVER 3)
   days.forEach((day) => {
     shiftTypes.forEach((shiftType) => {
       const key = `${day}_${shiftType}`;
       const currentAssigned = shiftAssignmentsMap.get(key) || [];
       if (currentAssigned.length < targetStaffPerShift) {
         const regSet = regMap.get(key) || new Set();
+        // Only candidates who registered for this exact day & shift and have at most 1 shift today
         const candidates = Array.from(regSet)
           .filter((userId) => !currentAssigned.includes(userId) && getDailyCount(day, userId) === 1)
           .sort((a, b) => (weeklyUserShiftCount.get(a) || 0) - (weeklyUserShiftCount.get(b) || 0));
@@ -111,47 +116,8 @@ export function autoScheduleWeek(
     });
   });
 
-  // PASS 3: If still understaffed (< targetStaffPerShift), check ANY active staff of this branch who have 0 shifts today
-  days.forEach((day) => {
-    shiftTypes.forEach((shiftType) => {
-      const key = `${day}_${shiftType}`;
-      const currentAssigned = shiftAssignmentsMap.get(key) || [];
-      if (currentAssigned.length < targetStaffPerShift) {
-        const candidates = activeStaff
-          .map((s) => s.id)
-          .filter((userId) => !currentAssigned.includes(userId) && getDailyCount(day, userId) === 0)
-          .sort((a, b) => (weeklyUserShiftCount.get(a) || 0) - (weeklyUserShiftCount.get(b) || 0));
-
-        while (candidates.length > 0 && (shiftAssignmentsMap.get(key) || []).length < targetStaffPerShift) {
-          const nextUser = candidates.shift();
-          if (nextUser) {
-            incrementUserShift(day, shiftType, nextUser);
-          }
-        }
-      }
-    });
-  });
-
-  // PASS 4: Final fallback for critical minimum 2 staff - check active staff with 1 shift today (never > 2 shifts)
-  days.forEach((day) => {
-    shiftTypes.forEach((shiftType) => {
-      const key = `${day}_${shiftType}`;
-      const currentAssigned = shiftAssignmentsMap.get(key) || [];
-      if (currentAssigned.length < targetStaffPerShift) {
-        const candidates = activeStaff
-          .map((s) => s.id)
-          .filter((userId) => !currentAssigned.includes(userId) && getDailyCount(day, userId) === 1)
-          .sort((a, b) => (weeklyUserShiftCount.get(a) || 0) - (weeklyUserShiftCount.get(b) || 0));
-
-        while (candidates.length > 0 && (shiftAssignmentsMap.get(key) || []).length < targetStaffPerShift) {
-          const nextUser = candidates.shift();
-          if (nextUser) {
-            incrementUserShift(day, shiftType, nextUser);
-          }
-        }
-      }
-    });
-  });
+  // NOTE: STRICT CONSTRAINT - Absolutely NO un-registered staff are assigned.
+  // If a shift has fewer than targetStaffPerShift, we leave it as-is and report in warnings.
 
   // Build final assignments
   const finalAssignments: ShiftAssignment[] = [];
@@ -166,12 +132,17 @@ export function autoScheduleWeek(
     shiftTypes.forEach((shiftType) => {
       const key = `${day}_${shiftType}`;
       const assigned = shiftAssignmentsMap.get(key) || [];
+      const regSet = regMap.get(key) || new Set();
       
       if (assigned.length < targetStaffPerShift) {
         understaffedCount++;
         const dayLabel = DAYS_OF_WEEK.find((d) => d.key === day)?.label || day;
         const shiftName = shiftType === 'morning' ? 'Ca Sáng' : shiftType === 'afternoon' ? 'Ca Chiều' : 'Ca Tối';
-        warnings.push(`${dayLabel} (${solarInfo.formattedShort}) - ${shiftName}: Hiện chỉ có ${assigned.length}/${targetStaffPerShift} nhân viên.`);
+        if (regSet.size === 0) {
+          warnings.push(`${dayLabel} (${solarInfo.formattedShort}) - ${shiftName}: Chưa có nhân viên nào đăng ký ca này.`);
+        } else {
+          warnings.push(`${dayLabel} (${solarInfo.formattedShort}) - ${shiftName}: Chỉ có ${assigned.length}/${targetStaffPerShift} nhân viên đăng ký ca.`);
+        }
       }
 
       finalAssignments.push({
