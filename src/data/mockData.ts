@@ -5,7 +5,8 @@ import {
   ShiftRegistration, 
   ShiftAssignment, 
   AttendanceRecord, 
-  TaskItem 
+  TaskItem,
+  RegistrationWeekControl
 } from '../types';
 
 export const INITIAL_BRANCHES: Branch[] = [
@@ -86,6 +87,23 @@ export const INITIAL_WIFI_CONFIG: WifiStoreConfig = {
 };
 
 export const CURRENT_WEEK_ID = '2026-W35';
+
+export const INITIAL_REGISTRATION_CONTROLS: RegistrationWeekControl[] = [
+  {
+    weekId: '2026-W35',
+    isOpen: true,
+    openedAt: '2026-08-24T00:00:00.000Z',
+    openedBy: 'Quản Lý Hệ Thống',
+    notes: 'Mở đăng ký ca tuần 35',
+  },
+  {
+    weekId: '2026-W36',
+    isOpen: true,
+    openedAt: '2026-08-24T00:00:00.000Z',
+    openedBy: 'Quản Lý Hệ Thống',
+    notes: 'Mở đăng ký ca tuần 36',
+  },
+];
 
 export const INITIAL_REGISTRATIONS: ShiftRegistration[] = [];
 

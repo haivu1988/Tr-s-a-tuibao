@@ -7,7 +7,8 @@ import {
   ShiftRegistration, 
   AttendanceRecord, 
   DayOfWeek, 
-  ShiftType 
+  ShiftType,
+  RegistrationWeekControl
 } from './types';
 import { 
   INITIAL_BRANCHES, 
@@ -16,6 +17,7 @@ import {
   INITIAL_REGISTRATIONS, 
   INITIAL_ASSIGNMENTS, 
   INITIAL_ATTENDANCE_LOGS, 
+  INITIAL_REGISTRATION_CONTROLS,
   CURRENT_WEEK_ID, 
   loadFromStorage, 
   saveToStorage 
@@ -37,6 +39,7 @@ import {
   subscribeRegistrations,
   subscribeAssignments,
   subscribeAttendance,
+  subscribeRegistrationControls,
   saveUserToFirestore,
   deleteUserFromFirestore,
   saveBranchToFirestore,
@@ -46,7 +49,8 @@ import {
   saveShiftAssignmentToFirestore,
   saveBatchAssignmentsToFirestore,
   saveAttendanceRecordToFirestore,
-  updateAttendanceRecordInFirestore
+  updateAttendanceRecordInFirestore,
+  saveRegistrationWeekControlToFirestore
 } from './lib/firebase';
 
 // Layout components
@@ -87,6 +91,7 @@ const STORAGE_KEY_WIFI = 'partflow_wifi_config_prod_v1';
 const STORAGE_KEY_REGS = 'partflow_registrations_prod_v1';
 const STORAGE_KEY_ASSIGNMENTS = 'partflow_assignments_prod_v1';
 const STORAGE_KEY_ATTENDANCE = 'partflow_attendance_prod_v1';
+const STORAGE_KEY_REG_CONTROLS = 'partflow_reg_controls_prod_v1';
 const STORAGE_KEY_CURRENT_USER = 'partflow_current_user_prod_v1';
 
 export default function App() {
@@ -150,6 +155,10 @@ export default function App() {
     loadFromStorage(STORAGE_KEY_ATTENDANCE, INITIAL_ATTENDANCE_LOGS)
   );
 
+  const [registrationControls, setRegistrationControls] = useState<RegistrationWeekControl[]>(() =>
+    loadFromStorage(STORAGE_KEY_REG_CONTROLS, INITIAL_REGISTRATION_CONTROLS)
+  );
+
   // Firestore Real-Time Subscriptions Setup
   useEffect(() => {
     // 1. Initialize DB defaults if first run
@@ -187,12 +196,19 @@ export default function App() {
       setAttendanceLogs(cloudLogs);
     });
 
+    const unsubRegControls = subscribeRegistrationControls((cloudControls) => {
+      if (cloudControls && cloudControls.length > 0) {
+        setRegistrationControls(cloudControls);
+      }
+    });
+
     return () => {
       unsubBranches();
       unsubUsers();
       unsubRegs();
       unsubAssignments();
       unsubAttendance();
+      unsubRegControls();
     };
   }, []);
 
@@ -276,6 +292,33 @@ export default function App() {
   useEffect(() => {
     saveToStorage(STORAGE_KEY_ATTENDANCE, attendanceLogs);
   }, [attendanceLogs]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEY_REG_CONTROLS, registrationControls);
+  }, [registrationControls]);
+
+  // Handler to toggle shift registration week open / close status
+  const handleToggleRegistrationWeek = async (targetWeekId: string, isOpen: boolean) => {
+    const existing = registrationControls.find((c) => c.weekId === targetWeekId);
+    const updatedControl: RegistrationWeekControl = {
+      weekId: targetWeekId,
+      isOpen,
+      openedAt: isOpen ? new Date().toISOString() : existing?.openedAt,
+      closedAt: !isOpen ? new Date().toISOString() : undefined,
+      openedBy: currentUser?.name || 'Quản Lý Hệ Thống',
+      branchId: activeBranchId,
+      notes: isOpen ? `Mở đăng ký ca cho ${targetWeekId}` : `Đóng đăng ký ca cho ${targetWeekId}`,
+    };
+
+    const nextControls = [
+      ...registrationControls.filter((c) => c.weekId !== targetWeekId),
+      updatedControl,
+    ];
+
+    setRegistrationControls(nextControls);
+    saveToStorage(STORAGE_KEY_REG_CONTROLS, nextControls);
+    await saveRegistrationWeekControlToFirestore(updatedControl);
+  };
 
   // Sync simulator changes
   const handleChangeSimulatedWifi = (ssid: string) => {
@@ -660,6 +703,8 @@ export default function App() {
                   onNavigateTab={(tab) => setActiveTab(tab)}
                   onOpenAutoSchedule={() => setIsAutoScheduleModalOpen(true)}
                   onOpenWifiModal={() => setIsWifiModalOpen(true)}
+                  registrationControls={registrationControls}
+                  onToggleRegistrationWeek={handleToggleRegistrationWeek}
                 />
               )}
 
@@ -689,6 +734,8 @@ export default function App() {
                   onOpenAutoSchedule={() => setIsAutoScheduleModalOpen(true)}
                   onEditAssignment={(assignment) => setShiftEditState({ isOpen: true, assignment })}
                   onApproveAll={handleApproveAllShifts}
+                  registrationControls={registrationControls}
+                  onToggleRegistrationWeek={handleToggleRegistrationWeek}
                 />
               )}
 
@@ -759,8 +806,15 @@ export default function App() {
                   currentUser={currentUser}
                   branches={branches}
                   weekId={weekId}
+                  onSelectWeek={setWeekId}
                   registrations={registrations}
                   onSaveRegistrations={handleSaveStaffRegistrations}
+                  isRegistrationOpen={
+                    registrationControls.find((c) => c.weekId === weekId)?.isOpen ?? true
+                  }
+                  registrationControl={
+                    registrationControls.find((c) => c.weekId === weekId)
+                  }
                 />
               )}
 

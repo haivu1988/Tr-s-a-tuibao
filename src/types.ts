@@ -162,3 +162,13 @@ export interface WifiStoreConfig {
   storeName: string;
   address: string;
 }
+
+export interface RegistrationWeekControl {
+  weekId: string; // e.g. "2026-W35"
+  isOpen: boolean; // true = opened by manager, false = closed
+  openedAt?: string;
+  closedAt?: string;
+  openedBy?: string;
+  branchId?: string; // Tùy chọn theo chi nhánh hoặc chung
+  notes?: string;
+}

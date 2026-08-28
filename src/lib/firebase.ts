@@ -21,7 +21,8 @@ import {
   ShiftRegistration, 
   ShiftAssignment, 
   AttendanceRecord, 
-  WifiStoreConfig 
+  WifiStoreConfig,
+  RegistrationWeekControl
 } from '../types';
 import { 
   INITIAL_BRANCHES, 
@@ -45,6 +46,7 @@ export const COLLECTIONS = {
   ASSIGNMENTS: 'shift_assignments',
   ATTENDANCE: 'attendance_records',
   SETTINGS: 'system_settings',
+  REGISTRATION_CONTROLS: 'registration_controls',
 };
 
 /**
@@ -260,5 +262,25 @@ export async function updateAttendanceRecordInFirestore(recordId: string, update
     await updateDoc(ref, updates);
   } catch (err) {
     console.error('Error updating attendance record:', err);
+  }
+}
+
+export function subscribeRegistrationControls(callback: (controls: RegistrationWeekControl[]) => void) {
+  const q = collection(db, COLLECTIONS.REGISTRATION_CONTROLS);
+  return onSnapshot(q, (snapshot) => {
+    const items: RegistrationWeekControl[] = [];
+    snapshot.forEach((d) => items.push(d.data() as RegistrationWeekControl));
+    callback(items);
+  }, (err) => {
+    console.error('Error listening to registration controls:', err);
+  });
+}
+
+export async function saveRegistrationWeekControlToFirestore(control: RegistrationWeekControl): Promise<void> {
+  try {
+    const ref = doc(db, COLLECTIONS.REGISTRATION_CONTROLS, control.weekId);
+    await setDoc(ref, control, { merge: true });
+  } catch (err) {
+    console.error('Error saving registration week control:', err);
   }
 }

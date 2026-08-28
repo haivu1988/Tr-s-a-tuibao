@@ -7,17 +7,20 @@ import {
   DAYS_OF_WEEK, 
   SHIFT_DEFINITIONS, 
   DayOfWeek, 
-  ShiftType 
+  ShiftType,
+  RegistrationWeekControl
 } from '../../types';
 import { 
   Sparkles, 
   CheckCheck, 
   Edit3, 
-  UserPlus, 
   Building2, 
-  Calendar, 
-  ChevronLeft, 
-  ChevronRight 
+  Calendar,
+  Lock,
+  Unlock,
+  CheckCircle2,
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { 
   getSolarDateInfo, 
@@ -34,6 +37,8 @@ interface ManagerScheduleViewProps {
   onSelectWeek: (weekId: string) => void;
   assignments: ShiftAssignment[];
   registrations: ShiftRegistration[];
+  registrationControls?: RegistrationWeekControl[];
+  onToggleRegistrationWeek?: (weekId: string, isOpen: boolean) => void;
   onOpenAutoSchedule: () => void;
   onEditAssignment: (assignment: ShiftAssignment) => void;
   onApproveAll: () => void;
@@ -48,6 +53,8 @@ export const ManagerScheduleView: React.FC<ManagerScheduleViewProps> = ({
   onSelectWeek,
   assignments = [],
   registrations = [],
+  registrationControls = [],
+  onToggleRegistrationWeek,
   onOpenAutoSchedule,
   onEditAssignment,
   onApproveAll,
@@ -74,10 +81,17 @@ export const ManagerScheduleView: React.FC<ManagerScheduleViewProps> = ({
     (r) => r.branchId === activeBranchId && r.weekId === weekId
   );
 
+  // Distinct staff who registered for this week
+  const registeredStaffIds = Array.from(new Set(branchRegistrations.map((r) => r.userId)));
+
   const solarWeekRange = getSolarWeekRangeText(weekId);
 
+  // Check if registration is open for this selected week
+  const currentWeekControl = registrationControls.find((c) => c.weekId === weekId);
+  const isRegistrationOpen = currentWeekControl ? currentWeekControl.isOpen : false;
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {/* Control Bar: Branch Selector, Solar Calendar Week Picker & Action Buttons */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         {/* Left: Branch & Solar Week Info */}
@@ -139,6 +153,75 @@ export const ManagerScheduleView: React.FC<ManagerScheduleViewProps> = ({
             <span>Duyệt Toàn Bộ Lịch</span>
           </button>
         </div>
+      </div>
+
+      {/* REGISTRATION GATE CONTROL BANNER FOR MANAGERS */}
+      <div
+        className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs ${
+          isRegistrationOpen
+            ? 'bg-emerald-50 border-emerald-300'
+            : 'bg-slate-50 border-slate-300'
+        }`}
+      >
+        <div className="flex items-start sm:items-center space-x-3.5">
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
+              isRegistrationOpen
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-200 text-slate-600'
+            }`}
+          >
+            {isRegistrationOpen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
+          </div>
+
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-sm text-slate-900">
+                Cổng Đăng Ký Ca Tuần ({solarWeekRange})
+              </span>
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                  isRegistrationOpen
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                }`}
+              >
+                {isRegistrationOpen ? '🟢 Đang Mở Đăng Ký' : '🔒 Đang Khóa / Đóng'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 mt-0.5">
+              {isRegistrationOpen
+                ? `Nhân viên chi nhánh đang được phép đăng ký (1, 2 hoặc 3 ca/ngày). Đã có ${registeredStaffIds.length}/${branchStaff.length} nhân viên gửi đăng ký (${branchRegistrations.length} lượt ca).`
+                : `Cổng đăng ký đang đóng. Nhân viên không thể sửa hay lưu nguyện vọng ca cho tuần này.`}
+            </p>
+          </div>
+        </div>
+
+        {/* Toggle Action Button */}
+        {onToggleRegistrationWeek && (
+          <div className="flex items-center space-x-2 shrink-0">
+            {isRegistrationOpen ? (
+              <button
+                type="button"
+                onClick={() => onToggleRegistrationWeek(weekId, false)}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors flex items-center space-x-2 cursor-pointer active:scale-95"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Đóng Cổng Đăng Ký Tuần Này</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onToggleRegistrationWeek(weekId, true)}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors flex items-center space-x-2 cursor-pointer active:scale-95"
+              >
+                <Unlock className="w-4 h-4" />
+                <span>Mở Cổng Đăng Ký Cho Tuần Này</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Solar Calendar Shift Roster Matrix */}
