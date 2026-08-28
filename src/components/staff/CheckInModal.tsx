@@ -325,7 +325,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               </div>
             </div>
 
-            {/* Device ID validation box */}
+            {/* Device MAC validation box */}
             <div
               className={`p-3 rounded-xl border flex items-start space-x-3 ${
                 deviceValidation.isValid
@@ -340,7 +340,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               />
               <div className="text-xs flex-1">
                 <div className="font-bold flex items-center justify-between">
-                  <span>Mã Máy: {currentDeviceId}</span>
+                  <span>Địa Chỉ MAC: {currentDeviceId}</span>
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
                       deviceValidation.isFirstRegistration
@@ -351,20 +351,20 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                     }`}
                   >
                     {deviceValidation.isFirstRegistration
-                      ? 'Đăng Ký Lần Đầu'
+                      ? 'Khóa MAC Lần Đầu'
                       : deviceValidation.isValid
-                      ? 'Thiết Bị Khớp'
-                      : 'Sai Thiết Bị!'}
+                      ? 'MAC Máy Khớp'
+                      : 'Sai MAC Điện Thoại!'}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
                   {deviceValidation.isFirstRegistration ? (
                     <span className="text-amber-700">
-                      *Mã này sẽ tự động được khóa cố định cho tài khoản của bạn khi bấm Check-in.
+                      *Địa chỉ MAC máy này sẽ tự động được khóa cố định cho tài khoản của bạn khi bấm Check-in.
                     </span>
                   ) : (
                     <span>
-                      Mã đã khóa: <span className="font-mono">{currentUser.registeredDeviceId}</span>
+                      MAC đã khóa: <span className="font-mono font-bold text-emerald-700">{currentUser.registeredDeviceId}</span>
                     </span>
                   )}
                 </div>

@@ -231,10 +231,10 @@ export const StaffDashboardView: React.FC<StaffDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Stat 4: Trạng thái mã máy */}
+        {/* Stat 4: Trạng thái địa chỉ MAC */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-            <span>Khóa Mã Thiết Bị</span>
+            <span>Khóa MAC Điện Thoại</span>
             <Smartphone className="w-4 h-4 text-indigo-600" />
           </div>
           <div className="mt-2 text-xs font-bold text-slate-900 flex items-center space-x-1">
@@ -244,11 +244,11 @@ export const StaffDashboardView: React.FC<StaffDashboardViewProps> = ({
                 {currentUser.registeredDeviceId}
               </span>
             ) : (
-              <span className="text-amber-600 text-xs">Chưa khóa mã máy</span>
+              <span className="text-amber-600 text-xs">Chưa khóa MAC</span>
             )}
           </div>
           <div className="mt-1 text-[11px] text-slate-500">
-            {currentUser.registeredDeviceId ? 'Chống chấm công hộ' : 'Sẽ khóa khi check-in'}
+            {currentUser.registeredDeviceId ? 'Chống chấm công hộ' : 'Sẽ tự động khóa khi check-in'}
           </div>
         </div>
       </div>

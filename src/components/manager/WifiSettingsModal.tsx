@@ -491,17 +491,17 @@ export const WifiSettingsModal: React.FC<WifiSettingsModalProps> = ({
             </form>
           </div>
 
-          {/* DEVICE ID MANAGEMENT FOR BRANCH STAFF */}
+          {/* DEVICE MAC MANAGEMENT FOR BRANCH STAFF */}
           <div className="pt-1">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-2">
                 <Smartphone className="w-4 h-4 text-slate-700" />
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Khóa Mã Máy Nhân Viên ({currentBranch.shortName})
+                  Khóa Địa Chỉ MAC Điện Thoại Nhân Viên ({currentBranch.shortName})
                 </h4>
               </div>
               <span className="text-[10px] text-slate-400">
-                *Chống chấm công hộ
+                *Chống chấm công hộ bằng điện thoại khác
               </span>
             </div>
 
@@ -510,7 +510,7 @@ export const WifiSettingsModal: React.FC<WifiSettingsModalProps> = ({
                 <thead>
                   <tr className="bg-slate-100/80 text-slate-600 font-semibold border-b border-slate-200 text-left">
                     <th className="p-2.5">Nhân viên</th>
-                    <th className="p-2.5">Mã máy đã khóa</th>
+                    <th className="p-2.5">Địa chỉ MAC đã khóa</th>
                     <th className="p-2.5 text-right">Reset</th>
                   </tr>
                 </thead>

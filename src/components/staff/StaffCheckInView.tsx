@@ -343,7 +343,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
             </div>
           </div>
 
-          {/* Device ID Verification Row */}
+          {/* Device MAC Address Verification Row */}
           <div
             className={`p-4 rounded-xl border flex items-start space-x-3 ${
               deviceValidation.isValid
@@ -360,7 +360,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900">Mã thiết bị di động (Device ID)</span>
+                <span className="text-xs font-bold text-slate-900">Địa chỉ MAC thiết bị (Hardware MAC)</span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                     deviceValidation.isValid
@@ -369,20 +369,20 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
                   }`}
                 >
                   {deviceValidation.isFirstRegistration
-                    ? 'Lần đầu (Sẽ khóa)'
+                    ? 'Lần đầu (Sẽ khóa MAC)'
                     : deviceValidation.isValid
-                    ? 'Khớp mã'
-                    : 'Sai thiết bị'}
+                    ? 'Khớp MAC máy'
+                    : 'Sai MAC máy'}
                 </span>
               </div>
               <div className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">
-                Mã hiện tại: {currentDeviceId}
+                MAC hiện tại: {currentDeviceId}
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
                 {currentUser.registeredDeviceId ? (
-                  <>Đã đăng ký: <span className="font-mono font-semibold">{currentUser.registeredDeviceId}</span></>
+                  <>MAC đã khóa: <span className="font-mono font-semibold">{currentUser.registeredDeviceId}</span></>
                 ) : (
-                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Mã này sẽ được lưu ngay khi bấm Check-in.</span>
+                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Địa chỉ MAC máy này sẽ được tự động khóa vào tài khoản của bạn ngay khi bấm Check-in.</span>
                 )}
               </p>
             </div>

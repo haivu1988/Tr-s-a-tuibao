@@ -294,7 +294,7 @@ export const ManagerAttendanceView: React.FC<ManagerAttendanceViewProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="flex items-center space-x-1 text-slate-500">
                         <Smartphone className="w-3 h-3 text-slate-500" />
-                        <span>Mã máy:</span>
+                        <span>Địa chỉ MAC máy:</span>
                       </span>
                       <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1 rounded text-[10px]">{log.deviceId}</span>
                     </div>
@@ -303,13 +303,13 @@ export const ManagerAttendanceView: React.FC<ManagerAttendanceViewProps> = ({
                   {/* Device Reset Button for manager */}
                   {staff?.registeredDeviceId && (
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[10px] text-emerald-700 font-medium">Thiết bị đã khóa</span>
+                      <span className="text-[10px] text-emerald-700 font-medium">MAC đã khóa</span>
                       <button
                         onClick={() => setResetConfirmUser(staff)}
                         className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors inline-flex items-center space-x-1 cursor-pointer"
                       >
                         <RotateCcw className="w-3 h-3" />
-                        <span>Reset Mã Máy</span>
+                        <span>Reset MAC Máy</span>
                       </button>
                     </div>
                   )}
@@ -333,9 +333,9 @@ export const ManagerAttendanceView: React.FC<ManagerAttendanceViewProps> = ({
                 <th className="py-3 px-3">Ngày (Dương Lịch)</th>
                 <th className="py-3 px-3">Ca & Giờ Vào/Ra</th>
                 <th className="py-3 px-3">WiFi & IP Ghim</th>
-                <th className="py-3 px-3">Mã Máy (Device ID)</th>
+                <th className="py-3 px-3">Địa Chỉ MAC Máy</th>
                 <th className="py-3 px-3">Trạng thái</th>
-                <th className="py-3 px-4 text-right">Khóa Máy</th>
+                <th className="py-3 px-4 text-right">Khóa MAC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

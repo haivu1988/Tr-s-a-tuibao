@@ -24,7 +24,11 @@ import {
   getClientDeviceId, 
   getSimulatedWifi, 
   setClientDeviceId, 
-  setSimulatedWifi 
+  setSimulatedWifi,
+  getSimulatedIp,
+  setSimulatedIp,
+  fetchCurrentPublicIp,
+  getDeviceMacAddress
 } from './utils/deviceWifi';
 import {
   initializeFirestoreDefaults,
@@ -213,9 +217,21 @@ export default function App() {
   const [currentSimulatedWifi, setCurrentSimulatedWifiState] = useState<string>(() =>
     getSimulatedWifi()
   );
+  const [currentSimulatedIp, setCurrentSimulatedIpState] = useState<string>(() =>
+    getSimulatedIp()
+  );
   const [currentDeviceId, setCurrentDeviceIdState] = useState<string>(() =>
     getClientDeviceId()
   );
+
+  // Tự động nhận diện địa chỉ IP thực tế của mạng WiFi điện thoại đang kết nối
+  useEffect(() => {
+    fetchCurrentPublicIp().then((realIp) => {
+      if (realIp) {
+        setCurrentSimulatedIpState(realIp);
+      }
+    });
+  }, []);
 
   // Modals state
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -261,6 +277,11 @@ export default function App() {
   const handleChangeSimulatedWifi = (ssid: string) => {
     setCurrentSimulatedWifiState(ssid);
     setSimulatedWifi(ssid);
+  };
+
+  const handleChangeSimulatedIp = (newIp: string) => {
+    setCurrentSimulatedIpState(newIp);
+    setSimulatedIp(newIp);
   };
 
   const handleChangeDeviceId = (newId: string) => {
@@ -562,6 +583,8 @@ export default function App() {
           onLogout={handleLogout}
           currentSimulatedWifi={currentSimulatedWifi}
           onChangeSimulatedWifi={handleChangeSimulatedWifi}
+          currentSimulatedIp={currentSimulatedIp}
+          onChangeSimulatedIp={handleChangeSimulatedIp}
           currentDeviceId={currentDeviceId}
           onChangeDeviceId={handleChangeDeviceId}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
@@ -660,6 +683,7 @@ export default function App() {
                   branches={branches}
                   wifiConfig={wifiConfig}
                   currentSimulatedWifi={currentSimulatedWifi}
+                  currentSimulatedIp={currentSimulatedIp}
                   currentDeviceId={currentDeviceId}
                   attendanceLogs={attendanceLogs}
                   onCheckInSuccess={handleCheckInSuccess}
@@ -776,6 +800,7 @@ export default function App() {
         branches={branches}
         wifiConfig={wifiConfig}
         currentSimulatedWifi={currentSimulatedWifi}
+        currentSimulatedIp={currentSimulatedIp}
         currentDeviceId={currentDeviceId}
         attendanceLogs={attendanceLogs}
         onCheckInSuccess={handleCheckInSuccess}
