@@ -303,8 +303,9 @@ export default function App() {
     const updatedControl: RegistrationWeekControl = {
       weekId: targetWeekId,
       isOpen,
-      openedAt: isOpen ? new Date().toISOString() : existing?.openedAt,
-      closedAt: !isOpen ? new Date().toISOString() : undefined,
+      openedAt: isOpen ? new Date().toISOString() : (existing?.openedAt || new Date().toISOString()),
+      ...(existing?.closedAt ? { closedAt: existing.closedAt } : {}),
+      ...(!isOpen ? { closedAt: new Date().toISOString() } : {}),
       openedBy: currentUser?.name || 'Quản Lý Hệ Thống',
       branchId: activeBranchId,
       notes: isOpen ? `Mở đăng ký ca cho ${targetWeekId}` : `Đóng đăng ký ca cho ${targetWeekId}`,

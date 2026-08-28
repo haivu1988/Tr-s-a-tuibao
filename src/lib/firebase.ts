@@ -30,6 +30,23 @@ import {
   INITIAL_WIFI_CONFIG 
 } from '../data/mockData';
 
+/**
+ * Remove undefined values recursively before passing to Firestore setDoc/updateDoc
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+        cleaned[key] = cleanFirestoreData(value);
+      } else {
+        cleaned[key] = value;
+      }
+    }
+  }
+  return cleaned;
+}
+
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
@@ -156,7 +173,7 @@ export function subscribeAttendance(callback: (logs: AttendanceRecord[]) => void
 export async function saveUserToFirestore(user: User): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.USERS, user.id);
-    await setDoc(ref, user, { merge: true });
+    await setDoc(ref, cleanFirestoreData(user), { merge: true });
   } catch (err) {
     console.error('Error saving user to Firestore:', err);
   }
@@ -174,7 +191,7 @@ export async function deleteUserFromFirestore(userId: string): Promise<void> {
 export async function saveBranchToFirestore(branch: Branch): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.BRANCHES, branch.id);
-    await setDoc(ref, branch, { merge: true });
+    await setDoc(ref, cleanFirestoreData(branch), { merge: true });
   } catch (err) {
     console.error('Error saving branch to Firestore:', err);
   }
@@ -192,7 +209,7 @@ export async function deleteBranchFromFirestore(branchId: string): Promise<void>
 export async function saveShiftRegistrationToFirestore(registration: ShiftRegistration): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.REGISTRATIONS, registration.id);
-    await setDoc(ref, registration, { merge: true });
+    await setDoc(ref, cleanFirestoreData(registration), { merge: true });
   } catch (err) {
     console.error('Error saving shift registration:', err);
   }
@@ -215,7 +232,7 @@ export async function saveBatchRegistrationsToFirestore(userId: string, weekId: 
     // 2. Set new registrations
     for (const reg of regs) {
       const ref = doc(db, COLLECTIONS.REGISTRATIONS, reg.id);
-      batch.set(ref, reg);
+      batch.set(ref, cleanFirestoreData(reg));
     }
     await batch.commit();
   } catch (err) {
@@ -227,7 +244,7 @@ export async function saveShiftAssignmentToFirestore(assignment: ShiftAssignment
   try {
     const docId = assignment.id || `${assignment.weekId}_${assignment.branchId || 'default'}_${assignment.day}_${assignment.shiftType}`;
     const ref = doc(db, COLLECTIONS.ASSIGNMENTS, docId);
-    await setDoc(ref, { ...assignment, id: docId }, { merge: true });
+    await setDoc(ref, cleanFirestoreData({ ...assignment, id: docId }), { merge: true });
   } catch (err) {
     console.error('Error saving shift assignment:', err);
   }
@@ -239,7 +256,7 @@ export async function saveBatchAssignmentsToFirestore(assignments: ShiftAssignme
     for (const assignment of assignments) {
       const docId = assignment.id || `${assignment.weekId}_${assignment.branchId || 'default'}_${assignment.day}_${assignment.shiftType}`;
       const ref = doc(db, COLLECTIONS.ASSIGNMENTS, docId);
-      batch.set(ref, { ...assignment, id: docId }, { merge: true });
+      batch.set(ref, cleanFirestoreData({ ...assignment, id: docId }), { merge: true });
     }
     await batch.commit();
   } catch (err) {
@@ -250,7 +267,7 @@ export async function saveBatchAssignmentsToFirestore(assignments: ShiftAssignme
 export async function saveAttendanceRecordToFirestore(record: AttendanceRecord): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.ATTENDANCE, record.id);
-    await setDoc(ref, record, { merge: true });
+    await setDoc(ref, cleanFirestoreData(record), { merge: true });
   } catch (err) {
     console.error('Error saving attendance record:', err);
   }
@@ -259,7 +276,7 @@ export async function saveAttendanceRecordToFirestore(record: AttendanceRecord):
 export async function updateAttendanceRecordInFirestore(recordId: string, updates: Partial<AttendanceRecord>): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.ATTENDANCE, recordId);
-    await updateDoc(ref, updates);
+    await updateDoc(ref, cleanFirestoreData(updates));
   } catch (err) {
     console.error('Error updating attendance record:', err);
   }
@@ -279,7 +296,7 @@ export function subscribeRegistrationControls(callback: (controls: RegistrationW
 export async function saveRegistrationWeekControlToFirestore(control: RegistrationWeekControl): Promise<void> {
   try {
     const ref = doc(db, COLLECTIONS.REGISTRATION_CONTROLS, control.weekId);
-    await setDoc(ref, control, { merge: true });
+    await setDoc(ref, cleanFirestoreData(control), { merge: true });
   } catch (err) {
     console.error('Error saving registration week control:', err);
   }
