@@ -22,7 +22,8 @@ import {
   Building2,
   Calendar,
   Pin,
-  Globe
+  Globe,
+  Cpu
 } from 'lucide-react';
 import { 
   validateDeviceForUser, 
@@ -31,6 +32,7 @@ import {
   getSimulatedIp,
   validateBranchWifiIp
 } from '../../utils/deviceWifi';
+import { getCachedHardwareDeviceInfo, scanDeviceHardwareProfile, HardwareDeviceInfo } from '../../utils/deviceFingerprint';
 import { getSolarDateInfo, formatSolarDateWithWeekday } from '../../utils/solarCalendar';
 import confetti from 'canvas-confetti';
 
@@ -62,6 +64,11 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
   const [selectedShift, setSelectedShift] = useState<ShiftType>('morning');
   const [notes, setNotes] = useState<string>('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [hwInfo, setHwInfo] = useState<HardwareDeviceInfo | null>(() => getCachedHardwareDeviceInfo());
+
+  useEffect(() => {
+    scanDeviceHardwareProfile().then((info) => setHwInfo(info));
+  }, []);
 
   const currentBranch = branches?.find((b) => b.id === currentUser.branchId) || branches?.[0] || {
     id: 'cn_quan1',
@@ -360,29 +367,48 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900">Địa chỉ MAC thiết bị (Hardware MAC)</span>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-bold text-slate-900">Địa chỉ MAC phần cứng điện thoại</span>
+                  {hwInfo && (
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-md">
+                      📱 {hwInfo.deviceName}
+                    </span>
+                  )}
+                </div>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    deviceValidation.isValid
+                    deviceValidation.isFirstRegistration
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : deviceValidation.isValid
                       ? 'bg-emerald-200 text-emerald-800'
                       : 'bg-rose-200 text-rose-800'
                   }`}
                 >
                   {deviceValidation.isFirstRegistration
-                    ? 'Lần đầu (Sẽ khóa MAC)'
+                    ? 'Lần đầu (Tự khóa MAC máy này)'
                     : deviceValidation.isValid
-                    ? 'Khớp MAC máy'
-                    : 'Sai MAC máy'}
+                    ? 'Khớp MAC máy chính chủ'
+                    : 'Sai MAC điện thoại'}
                 </span>
               </div>
-              <div className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">
-                MAC hiện tại: {currentDeviceId}
+              <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate flex items-center space-x-2">
+                <span>MAC máy: {currentDeviceId}</span>
+                <span className="text-[9px] font-sans font-normal text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                  🔒 Web Crypto SHA-256
+                </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
+              {hwInfo && (
+                <div className="text-[10.5px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
+                  <span>GPU: <strong className="text-slate-700">{hwInfo.gpuRenderer}</strong></span>
+                  <span>•</span>
+                  <span>CPU: <strong className="text-slate-700">{hwInfo.cpuCores} Cores</strong></span>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-500 mt-1">
                 {currentUser.registeredDeviceId ? (
-                  <>MAC đã khóa: <span className="font-mono font-semibold">{currentUser.registeredDeviceId}</span></>
+                  <>MAC đã khóa: <span className="font-mono font-semibold text-emerald-700">{currentUser.registeredDeviceId}</span></>
                 ) : (
-                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Địa chỉ MAC máy này sẽ được tự động khóa vào tài khoản của bạn ngay khi bấm Check-in.</span>
+                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Địa chỉ MAC phần cứng từ chiếc điện thoại này sẽ được tự động khóa vĩnh viễn vào tài khoản của bạn khi bấm Check-in.</span>
                 )}
               </p>
             </div>

@@ -1,4 +1,10 @@
 import { WifiStoreConfig, User, Branch } from '../types';
+import { 
+  getRealDeviceHardwareMacSync, 
+  scanDeviceHardwareProfile, 
+  getCachedHardwareDeviceInfo, 
+  HardwareDeviceInfo 
+} from './deviceFingerprint';
 
 const STORAGE_KEY_CLIENT_DEVICE = 'partflow_client_device_id';
 const STORAGE_KEY_DEVICE_MAC = 'partflow_device_mac_address';
@@ -6,57 +12,37 @@ const STORAGE_KEY_SIMULATED_WIFI = 'partflow_simulated_wifi';
 const STORAGE_KEY_SIMULATED_IP = 'partflow_simulated_ip';
 
 /**
- * Tự động tạo và lưu trữ Địa chỉ MAC phần cứng (Hardware MAC Address) duy nhất trên mỗi điện thoại cá nhân.
- * Định dạng chuẩn 6 octet: XX:XX:XX:XX:XX:XX (ví dụ: D8:3B:BF:12:4A:89).
- * Được tính toán dựa trên các đặc tính phần cứng (GPU WebGL, độ phân giải màn hình, CPU Cores, Canvas entropy).
+ * Tự động trích xuất Địa chỉ MAC phần cứng (Hardware MAC Address) từ điện thoại thực tế của nhân viên.
+ * Định dạng chuẩn IEEE 802: XX:XX:XX:XX:XX:XX (ví dụ: D8:3B:BF:12:4A:89).
+ * Được tính toán dựa trên WebGL GPU Chipset, màn hình, CPU Cores, và Web Cryptography SHA-256 Digest.
  */
 export function getDeviceMacAddress(): string {
-  // Kiểm tra nếu đã có MAC lưu trữ trên máy này
-  let mac = localStorage.getItem(STORAGE_KEY_DEVICE_MAC);
-  if (mac && /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(mac.replace(/^MAC:\s*/i, ''))) {
-    return mac.toUpperCase();
-  }
-
-  // Thu thập các thông số phần cứng thiết bị
-  const screenInfo = `${typeof window !== 'undefined' ? window.screen?.width || 390 : 390}x${typeof window !== 'undefined' ? window.screen?.height || 844 : 844}x${typeof window !== 'undefined' ? window.screen?.colorDepth || 24 : 24}`;
-  const navInfo = `${typeof navigator !== 'undefined' ? navigator.language || 'vi' : 'vi'}_${typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 8 : 8}_${typeof navigator !== 'undefined' ? navigator.platform || 'iPhone' : 'iPhone'}`;
-  const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-
-  // Băm thông số phần cứng
-  let hash = 0;
-  const rawSeed = screenInfo + navInfo + ua + (typeof window !== 'undefined' ? window.location.host : '') + (Math.random().toString(36).substring(2, 7));
-  for (let i = 0; i < rawSeed.length; i++) {
-    const char = rawSeed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
-  }
-
-  // Các tiền tố OUI MAC phổ biến của smartphone (Apple, Samsung, Xiaomi, v.v.)
-  const vendorPrefixes = ['D8', '4C', '5C', '88', '3A', 'F4', 'A0', '7E', 'B4', 'E8'];
-  const firstByte = vendorPrefixes[Math.abs(hash) % vendorPrefixes.length];
-  
-  const hexBytes: string[] = [firstByte];
-  for (let i = 1; i < 6; i++) {
-    const seed = Math.abs((hash * (i + 17)) ^ Math.floor(Math.random() * 0xFFFFFF));
-    const byte = (seed % 256).toString(16).padStart(2, '0').toUpperCase();
-    hexBytes.push(byte);
-  }
-
-  mac = hexBytes.join(':');
-  localStorage.setItem(STORAGE_KEY_DEVICE_MAC, mac);
-  localStorage.setItem(STORAGE_KEY_CLIENT_DEVICE, mac);
-  return mac;
+  return getRealDeviceHardwareMacSync();
 }
 
 // Giữ lại hàm tương thích ngược getClientDeviceId
 export function getClientDeviceId(): string {
-  return getDeviceMacAddress();
+  return getRealDeviceHardwareMacSync();
+}
+
+/**
+ * Trích xuất toàn bộ thông tin phần cứng sâu của điện thoại (Bất đồng bộ)
+ */
+export async function getDetailedDeviceHardwareProfile(): Promise<HardwareDeviceInfo> {
+  return await scanDeviceHardwareProfile();
+}
+
+export function getCachedDeviceHardwareInfo(): HardwareDeviceInfo | null {
+  return getCachedHardwareDeviceInfo();
 }
 
 export function setClientDeviceId(newDeviceId: string): void {
   const cleanMac = newDeviceId.trim().toUpperCase();
-  localStorage.setItem(STORAGE_KEY_DEVICE_MAC, cleanMac);
-  localStorage.setItem(STORAGE_KEY_CLIENT_DEVICE, cleanMac);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_DEVICE_MAC, cleanMac);
+    localStorage.setItem(STORAGE_KEY_CLIENT_DEVICE, cleanMac);
+    localStorage.setItem('partflow_hardware_device_mac', cleanMac);
+  }
 }
 
 export function getSimulatedWifi(): string {

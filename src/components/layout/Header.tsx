@@ -16,11 +16,14 @@ import {
   Globe,
   Users,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Cpu,
+  ShieldCheck
 } from 'lucide-react';
 import { User, Branch } from '../../types';
 import { formatSolarDateWithWeekday } from '../../utils/solarCalendar';
 import { OnlinePresence, FIRESTORE_DATABASE_URL } from '../../lib/syncEngine';
+import { scanDeviceHardwareProfile, getCachedHardwareDeviceInfo, HardwareDeviceInfo } from '../../utils/deviceFingerprint';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -74,6 +77,30 @@ export const Header: React.FC<HeaderProps> = ({
   const [showSimulateDrawer, setShowSimulateDrawer] = useState<boolean>(false);
   const [showBranchDropdown, setShowBranchDropdown] = useState<boolean>(false);
   const [showOnlineDropdown, setShowOnlineDropdown] = useState<boolean>(false);
+  const [hwInfo, setHwInfo] = useState<HardwareDeviceInfo | null>(() => getCachedHardwareDeviceInfo());
+  const [isScanningHw, setIsScanningHw] = useState<boolean>(false);
+
+  useEffect(() => {
+    scanDeviceHardwareProfile().then((info) => {
+      setHwInfo(info);
+      if (info.macAddress && info.macAddress !== currentDeviceId) {
+        onChangeDeviceId(info.macAddress);
+      }
+    });
+  }, []);
+
+  const handleScanHardware = async () => {
+    setIsScanningHw(true);
+    try {
+      const info = await scanDeviceHardwareProfile();
+      setHwInfo(info);
+      if (info.macAddress) {
+        onChangeDeviceId(info.macAddress);
+      }
+    } finally {
+      setIsScanningHw(false);
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -486,43 +513,75 @@ export const Header: React.FC<HeaderProps> = ({
                     </p>
                   </div>
 
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1.5 flex items-center space-x-1">
-                      <Smartphone className="w-3 h-3 text-slate-600" />
-                      <span>Địa Chỉ MAC Thiết Bị (Device MAC):</span>
-                    </label>
+                  {/* Real Phone Hardware MAC & Fingerprint */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center space-x-1">
+                        <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Địa Chỉ MAC Phần Cứng Điện Thoại:</span>
+                      </label>
+                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full flex items-center space-x-0.5">
+                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-700" />
+                        <span>Web Crypto SHA-256</span>
+                      </span>
+                    </div>
+
                     <div className="flex space-x-2">
                       <input
                         type="text"
                         value={currentDeviceId}
                         onChange={(e) => onChangeDeviceId(e.target.value)}
-                        className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-800"
+                        className="flex-1 text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-900 focus:ring-1 focus:ring-emerald-500"
                         placeholder="D8:3B:BF:12:4A:89"
                       />
                       <button
-                        onClick={() => {
-                          const vendorPrefixes = ['D8', '4C', '5C', '88', '3A', 'F4', 'A0', '7E'];
-                          const prefix = vendorPrefixes[Math.floor(Math.random() * vendorPrefixes.length)];
-                          const hexParts = [prefix];
-                          for (let i = 0; i < 5; i++) {
-                            hexParts.push(Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase());
-                          }
-                          onChangeDeviceId(hexParts.join(':'));
-                        }}
-                        title="Tạo địa chỉ MAC ngẫu nhiên mới"
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs cursor-pointer"
+                        type="button"
+                        onClick={handleScanHardware}
+                        disabled={isScanningHw}
+                        title="Quét lại thông số phần cứng từ điện thoại này"
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center space-x-1 shadow-2xs transition-colors disabled:opacity-50"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        <RefreshCw className={`w-3.5 h-3.5 ${isScanningHw ? 'animate-spin' : ''}`} />
+                        <span className="text-[11px]">Quét Máy</span>
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">
+
+                    {/* Detected Hardware Specs Card */}
+                    {hwInfo && (
+                      <div className="bg-white border border-slate-200/80 rounded-lg p-2 text-[10.5px] space-y-1 text-slate-600">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 flex items-center space-x-1">
+                            <Smartphone className="w-3 h-3 text-slate-400" />
+                            <span>Thiết bị:</span>
+                          </span>
+                          <span className="font-bold text-emerald-700">{hwInfo.deviceName} ({hwInfo.osName})</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 flex items-center space-x-1">
+                            <Cpu className="w-3 h-3 text-slate-400" />
+                            <span>GPU / Chipset:</span>
+                          </span>
+                          <span className="font-mono text-slate-700 truncate max-w-[150px]" title={hwInfo.gpuRenderer}>
+                            {hwInfo.gpuRenderer}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 border-t border-slate-100">
+                          <span>Màn hình: {hwInfo.screenResolution}</span>
+                          <span>{hwInfo.cpuCores} CPU Cores</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-[10.5px] text-slate-500">
                       {currentUser?.registeredDeviceId ? (
-                        <span className="text-emerald-600 font-medium">
-                          MAC đã khóa: {currentUser.registeredDeviceId}
+                        <span className="text-emerald-700 font-semibold flex items-center space-x-1">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          <span>Đã khóa với MAC: <span className="font-mono">{currentUser.registeredDeviceId}</span></span>
                         </span>
                       ) : (
-                        <span className="text-amber-600 font-medium">
-                          Chưa khóa MAC. Sẽ tự động ghim MAC này khi check in lần đầu!
+                        <span className="text-amber-700 font-medium flex items-center space-x-1">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          <span>Chưa khóa MAC. Sẽ tự động ghim phần cứng điện thoại này khi Check-in lần đầu!</span>
                         </span>
                       )}
                     </p>

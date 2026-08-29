@@ -217,12 +217,28 @@ export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
                         <Smartphone className="w-3.5 h-3.5" />
                         <span>
                           {staff.registeredDeviceId ? (
-                            <span className="font-mono text-[11px] text-emerald-700 font-semibold">
-                              Đã khóa MAC: {staff.registeredDeviceId}
+                            <span className="inline-flex items-center space-x-1.5">
+                              <span className="font-mono text-[11px] text-emerald-700 font-semibold">
+                                Đã khóa MAC: {staff.registeredDeviceId}
+                              </span>
+                              {onResetStaffDevice && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`Mở khóa MAC phần cứng cho nhân viên "${staff.name}"? Sau khi mở khóa, nhân viên có thể sử dụng điện thoại mới để check-in.`)) {
+                                      onResetStaffDevice(staff.id);
+                                    }
+                                  }}
+                                  title="Mở khóa để nhân viên đổi sang điện thoại mới"
+                                  className="text-[10px] text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded font-bold transition-colors cursor-pointer"
+                                >
+                                  Mở khóa đổi máy
+                                </button>
+                              )}
                             </span>
                           ) : (
                             <span className="italic text-amber-600">
-                              Chưa khóa MAC (Tự khóa khi Check-in)
+                              Chưa khóa MAC (Tự động ghim khi Check-in)
                             </span>
                           )}
                         </span>
