@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Branch } from '../../types';
+import { OnlinePresence } from '../../lib/syncEngine';
 import { 
   Users, 
   UserPlus, 
@@ -28,6 +29,7 @@ interface ManagerStaffViewProps {
   onUpdateStaffHourlyRate: (userId: string, newRate: number) => void;
   onReassignStaffBranch: (userId: string, newBranchId: string) => void;
   onResetStaffDevice?: (userId: string) => void;
+  onlinePresences?: OnlinePresence[];
 }
 
 export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
@@ -39,6 +41,7 @@ export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
   onUpdateStaffHourlyRate,
   onReassignStaffBranch,
   onResetStaffDevice,
+  onlinePresences = [],
 }) => {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>(activeBranchId || 'all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -159,16 +162,33 @@ export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
               >
                 {/* User Info */}
                 <div className="flex items-center space-x-3.5 min-w-0">
-                  <img
-                    src={staff.avatar}
-                    alt={staff.name}
-                    className="w-12 h-12 rounded-2xl object-cover border border-slate-200 shadow-2xs shrink-0"
-                  />
+                  <div className="relative shrink-0">
+                    <img
+                      src={staff.avatar}
+                      alt={staff.name}
+                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 shadow-2xs"
+                    />
+                    {onlinePresences.some((p) => p.userId === staff.id) && (
+                      <span 
+                        title="Đang Online trên hệ thống"
+                        className="absolute -top-1 -right-1 flex h-3.5 w-3.5"
+                      >
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-white"></span>
+                      </span>
+                    )}
+                  </div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center space-x-2">
                       <h4 className="text-sm font-bold text-slate-900 truncate">
                         {staff.name}
                       </h4>
+                      {onlinePresences.some((p) => p.userId === staff.id) && (
+                        <span className="inline-flex items-center space-x-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                          <span>Online</span>
+                        </span>
+                      )}
                       <span className="font-mono text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">
                         ID: {staff.id}
                       </span>

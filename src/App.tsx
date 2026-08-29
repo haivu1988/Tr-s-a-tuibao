@@ -52,6 +52,18 @@ import {
   updateAttendanceRecordInFirestore,
   saveRegistrationWeekControlToFirestore
 } from './lib/firebase';
+import {
+  initRealtimeSyncEngine,
+  startUserPresenceHeartbeat,
+  stopUserPresenceHeartbeat,
+  subscribeToOnlinePresence,
+  subscribeToDataSync,
+  subscribeToQuotaStatus,
+  broadcastSyncMessage,
+  OnlinePresence,
+  FIRESTORE_DATABASE_URL
+} from './lib/syncEngine';
+import { AlertTriangle, ExternalLink, RefreshCw, X } from 'lucide-react';
 
 // Layout components
 import { Header } from './components/layout/Header';
@@ -158,6 +170,50 @@ export default function App() {
   const [registrationControls, setRegistrationControls] = useState<RegistrationWeekControl[]>(() =>
     loadFromStorage(STORAGE_KEY_REG_CONTROLS, INITIAL_REGISTRATION_CONTROLS)
   );
+
+  // Real-time Online Presence & Quota States
+  const [onlinePresences, setOnlinePresences] = useState<OnlinePresence[]>([]);
+  const [isQuotaExceeded, setIsQuotaExceeded] = useState<boolean>(false);
+  const [showQuotaBanner, setShowQuotaBanner] = useState<boolean>(true);
+
+  // Initialize Real-time Sync Engine & Cross-tab Event Listeners
+  useEffect(() => {
+    initRealtimeSyncEngine();
+
+    const unsubPresence = subscribeToOnlinePresence((list) => {
+      setOnlinePresences(list);
+    });
+
+    const unsubQuota = subscribeToQuotaStatus((exceeded) => {
+      setIsQuotaExceeded(exceeded);
+    });
+
+    const unsubDataSync = subscribeToDataSync((msg) => {
+      if (msg.type === 'SYNC_USERS' && msg.payload) {
+        setUsers(msg.payload);
+        if (currentUser) {
+          const fresh = (msg.payload as User[]).find((u) => u.id === currentUser.id);
+          if (fresh) setCurrentUser(fresh);
+        }
+      } else if (msg.type === 'SYNC_REGISTRATIONS' && msg.payload) {
+        setRegistrations(msg.payload);
+      } else if (msg.type === 'SYNC_ASSIGNMENTS' && msg.payload) {
+        setAssignments(msg.payload);
+      } else if (msg.type === 'SYNC_ATTENDANCE' && msg.payload) {
+        setAttendanceLogs(msg.payload);
+      } else if (msg.type === 'SYNC_BRANCHES' && msg.payload) {
+        setBranches(msg.payload);
+      } else if (msg.type === 'SYNC_REG_CONTROLS' && msg.payload) {
+        setRegistrationControls(msg.payload);
+      }
+    });
+
+    return () => {
+      unsubPresence();
+      unsubQuota();
+      unsubDataSync();
+    };
+  }, [currentUser]);
 
   // Firestore Real-Time Subscriptions Setup
   useEffect(() => {
@@ -297,6 +353,18 @@ export default function App() {
     saveToStorage(STORAGE_KEY_REG_CONTROLS, registrationControls);
   }, [registrationControls]);
 
+  // Heartbeat presence lifecycle for current logged in user
+  useEffect(() => {
+    if (currentUser) {
+      startUserPresenceHeartbeat(currentUser, currentDeviceId);
+    } else {
+      stopUserPresenceHeartbeat();
+    }
+    return () => {
+      stopUserPresenceHeartbeat();
+    };
+  }, [currentUser, currentDeviceId]);
+
   // Handler to toggle shift registration week open / close status
   const handleToggleRegistrationWeek = async (targetWeekId: string, isOpen: boolean) => {
     const existing = registrationControls.find((c) => c.weekId === targetWeekId);
@@ -318,6 +386,7 @@ export default function App() {
 
     setRegistrationControls(nextControls);
     saveToStorage(STORAGE_KEY_REG_CONTROLS, nextControls);
+    broadcastSyncMessage('SYNC_REG_CONTROLS', nextControls);
     await saveRegistrationWeekControlToFirestore(updatedControl);
   };
 
@@ -350,10 +419,11 @@ export default function App() {
   const handleSaveBranch = (savedBranch: Branch) => {
     setBranches((prev) => {
       const exists = prev.some((b) => b.id === savedBranch.id);
-      if (exists) {
-        return prev.map((b) => (b.id === savedBranch.id ? savedBranch : b));
-      }
-      return [...prev, savedBranch];
+      const updatedList = exists
+        ? prev.map((b) => (b.id === savedBranch.id ? savedBranch : b))
+        : [...prev, savedBranch];
+      broadcastSyncMessage('SYNC_BRANCHES', updatedList);
+      return updatedList;
     });
     saveBranchToFirestore(savedBranch);
   };
@@ -367,18 +437,21 @@ export default function App() {
     const fallbackBranchId = remainingBranches[0].id;
 
     // Move any staff from deleted branch to fallback branch
-    setUsers((prev) =>
-      prev.map((u) => {
+    setUsers((prev) => {
+      const updatedUsers = prev.map((u) => {
         if (u.branchId === branchIdToDelete) {
           const updated = { ...u, branchId: fallbackBranchId };
           saveUserToFirestore(updated);
           return updated;
         }
         return u;
-      })
-    );
+      });
+      broadcastSyncMessage('SYNC_USERS', updatedUsers);
+      return updatedUsers;
+    });
 
     setBranches(remainingBranches);
+    broadcastSyncMessage('SYNC_BRANCHES', remainingBranches);
     deleteBranchFromFirestore(branchIdToDelete);
     if (activeBranchId === branchIdToDelete) {
       setActiveBranchId(fallbackBranchId);
@@ -386,16 +459,18 @@ export default function App() {
   };
 
   const handleReassignStaffBranch = (userId: string, newBranchId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+    setUsers((prev) => {
+      const updated = prev.map((u) => {
         if (u.id === userId) {
-          const updated = { ...u, branchId: newBranchId };
-          saveUserToFirestore(updated);
-          return updated;
+          const uUpdated = { ...u, branchId: newBranchId };
+          saveUserToFirestore(uUpdated);
+          return uUpdated;
         }
         return u;
-      })
-    );
+      });
+      broadcastSyncMessage('SYNC_USERS', updated);
+      return updated;
+    });
     if (currentUser?.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, branchId: newBranchId } : null));
     }
@@ -407,16 +482,19 @@ export default function App() {
       const updated = { ...targetBranch, pinnedWifiSsid: wifiSsid };
       saveBranchToFirestore(updated);
     }
-    setBranches((prev) =>
-      prev.map((b) =>
+    setBranches((prev) => {
+      const nextBranches = prev.map((b) =>
         b.id === branchId ? { ...b, pinnedWifiSsid: wifiSsid } : b
-      )
-    );
+      );
+      broadcastSyncMessage('SYNC_BRANCHES', nextBranches);
+      return nextBranches;
+    });
   };
 
   // Auth Handlers
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    startUserPresenceHeartbeat(user, currentDeviceId);
     if (user.role === 'manager') {
       setActiveTab('dashboard');
     } else {
@@ -429,9 +507,14 @@ export default function App() {
   };
 
   const handleRegister = (newUser: User) => {
-    setUsers((prev) => [...prev, newUser]);
+    setUsers((prev) => {
+      const updated = [...prev, newUser];
+      broadcastSyncMessage('SYNC_USERS', updated);
+      return updated;
+    });
     saveUserToFirestore(newUser);
     setCurrentUser(newUser);
+    startUserPresenceHeartbeat(newUser, currentDeviceId);
     if (newUser.role === 'manager') {
       setActiveTab('dashboard');
     } else {
@@ -444,12 +527,16 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    if (currentUser) {
+      stopUserPresenceHeartbeat(currentUser.id);
+    }
     setCurrentUser(null);
     saveToStorage(STORAGE_KEY_CURRENT_USER, null);
   };
 
   const handleSelectUser = (user: User) => {
     setCurrentUser(user);
+    startUserPresenceHeartbeat(user, currentDeviceId);
     if (user.role === 'manager') {
       if (!['dashboard', 'schedule', 'attendance', 'reports'].includes(activeTab)) {
         setActiveTab('dashboard');
@@ -471,7 +558,9 @@ export default function App() {
       const otherBranchesAssignments = prev.filter(
         (a) => a.branchId && a.branchId !== activeBranchId
       );
-      return [...otherBranchesAssignments, ...generatedAssignments];
+      const nextAssignments = [...otherBranchesAssignments, ...generatedAssignments];
+      broadcastSyncMessage('SYNC_ASSIGNMENTS', nextAssignments);
+      return nextAssignments;
     });
     saveBatchAssignmentsToFirestore(generatedAssignments);
   };
@@ -486,32 +575,35 @@ export default function App() {
           item.shiftType === updated.shiftType &&
           item.branchId === updated.branchId
       );
-      if (exists) {
-        return prev.map((item) =>
-          item.weekId === updated.weekId &&
-          item.day === updated.day &&
-          item.shiftType === updated.shiftType &&
-          item.branchId === updated.branchId
-            ? updated
-            : item
-        );
-      }
-      return [...prev, updated];
+      const nextAssignments = exists
+        ? prev.map((item) =>
+            item.weekId === updated.weekId &&
+            item.day === updated.day &&
+            item.shiftType === updated.shiftType &&
+            item.branchId === updated.branchId
+              ? updated
+              : item
+          )
+        : [...prev, updated];
+      broadcastSyncMessage('SYNC_ASSIGNMENTS', nextAssignments);
+      return nextAssignments;
     });
   };
 
   const handleApproveAllShifts = () => {
     const approvedList: ShiftAssignment[] = [];
-    setAssignments((prev) =>
-      prev.map((item) => {
+    setAssignments((prev) => {
+      const nextAssignments = prev.map((item) => {
         if (item.weekId === weekId && (!item.branchId || item.branchId === activeBranchId)) {
           const approved: ShiftAssignment = { ...item, status: 'approved' };
           approvedList.push(approved);
           return approved;
         }
         return item;
-      })
-    );
+      });
+      broadcastSyncMessage('SYNC_ASSIGNMENTS', nextAssignments);
+      return nextAssignments;
+    });
     if (approvedList.length > 0) {
       saveBatchAssignmentsToFirestore(approvedList);
     }
@@ -519,12 +611,18 @@ export default function App() {
 
   // Attendance Handlers
   const handleCheckInSuccess = (newRecord: AttendanceRecord, updatedUser?: User) => {
-    setAttendanceLogs((prev) => [newRecord, ...prev]);
+    setAttendanceLogs((prev) => {
+      const nextLogs = [newRecord, ...prev];
+      broadcastSyncMessage('SYNC_ATTENDANCE', nextLogs);
+      return nextLogs;
+    });
     saveAttendanceRecordToFirestore(newRecord);
     if (updatedUser) {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
-      );
+      setUsers((prev) => {
+        const nextUsers = prev.map((u) => (u.id === updatedUser.id ? updatedUser : u));
+        broadcastSyncMessage('SYNC_USERS', nextUsers);
+        return nextUsers;
+      });
       saveUserToFirestore(updatedUser);
       if (currentUser?.id === updatedUser.id) {
         setCurrentUser(updatedUser);
@@ -533,8 +631,8 @@ export default function App() {
   };
 
   const handleCheckOutSuccess = (recordId: string, checkOutTime: string, durationHours: number) => {
-    setAttendanceLogs((prev) =>
-      prev.map((rec) => {
+    setAttendanceLogs((prev) => {
+      const nextLogs = prev.map((rec) => {
         if (rec.id === recordId) {
           return {
             ...rec,
@@ -544,8 +642,10 @@ export default function App() {
           };
         }
         return rec;
-      })
-    );
+      });
+      broadcastSyncMessage('SYNC_ATTENDANCE', nextLogs);
+      return nextLogs;
+    });
     updateAttendanceRecordInFirestore(recordId, {
       checkOutTime,
       workDurationHours: durationHours,
@@ -554,32 +654,36 @@ export default function App() {
   };
 
   const handleResetDevice = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+    setUsers((prev) => {
+      const nextUsers = prev.map((u) => {
         if (u.id === userId) {
           const reset = { ...u, registeredDeviceId: null };
           saveUserToFirestore(reset);
           return reset;
         }
         return u;
-      })
-    );
+      });
+      broadcastSyncMessage('SYNC_USERS', nextUsers);
+      return nextUsers;
+    });
     if (currentUser?.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, registeredDeviceId: null } : null));
     }
   };
 
   const handleUpdateStaffHourlyRate = (userId: string, newRate: number) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+    setUsers((prev) => {
+      const nextUsers = prev.map((u) => {
         if (u.id === userId) {
           const updated = { ...u, hourlyRate: newRate };
           saveUserToFirestore(updated);
           return updated;
         }
         return u;
-      })
-    );
+      });
+      broadcastSyncMessage('SYNC_USERS', nextUsers);
+      return nextUsers;
+    });
     if (currentUser?.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, hourlyRate: newRate } : null));
     }
@@ -588,16 +692,21 @@ export default function App() {
   const handleAddStaff = (newStaff: User) => {
     setUsers((prev) => {
       const exists = prev.some((u) => u.id === newStaff.id);
-      if (exists) {
-        return prev.map((u) => (u.id === newStaff.id ? newStaff : u));
-      }
-      return [...prev, newStaff];
+      const nextUsers = exists
+        ? prev.map((u) => (u.id === newStaff.id ? newStaff : u))
+        : [...prev, newStaff];
+      broadcastSyncMessage('SYNC_USERS', nextUsers);
+      return nextUsers;
     });
     saveUserToFirestore(newStaff);
   };
 
   const handleDeleteStaff = (userId: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    setUsers((prev) => {
+      const nextUsers = prev.filter((u) => u.id !== userId);
+      broadcastSyncMessage('SYNC_USERS', nextUsers);
+      return nextUsers;
+    });
     deleteUserFromFirestore(userId);
   };
 
@@ -605,14 +714,17 @@ export default function App() {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, avatar: newAvatarUrl };
     setCurrentUser(updatedUser);
-    setUsers((prev) =>
-      prev.map((u) => (u.id === currentUser.id ? updatedUser : u))
-    );
+    setUsers((prev) => {
+      const nextUsers = prev.map((u) => (u.id === currentUser.id ? updatedUser : u));
+      broadcastSyncMessage('SYNC_USERS', nextUsers);
+      return nextUsers;
+    });
     saveUserToFirestore(updatedUser);
   };
 
   const handleSaveStaffRegistrations = (newRegs: ShiftRegistration[]) => {
     setRegistrations(newRegs);
+    broadcastSyncMessage('SYNC_REGISTRATIONS', newRegs);
     if (currentUser) {
       const myRegsThisWeek = newRegs.filter(
         (r) => r.userId === currentUser.id && r.weekId === weekId
@@ -680,7 +792,40 @@ export default function App() {
           onChangeDeviceId={handleChangeDeviceId}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onOpenAvatarModal={() => setIsAvatarModalOpen(true)}
+          onlinePresences={onlinePresences}
+          isQuotaExceeded={isQuotaExceeded}
         />
+
+        {/* Quota Exceeded Notification Banner */}
+        {isQuotaExceeded && showQuotaBanner && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-2.5 flex items-center justify-between shadow-xs border-b border-amber-600/30 text-xs shrink-0 animate-in slide-in-from-top duration-300">
+            <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+              <AlertTriangle className="w-4 h-4 text-slate-950 shrink-0 font-bold" />
+              <div className="truncate">
+                <span className="font-bold">Đã kích hoạt P2P Realtime Engine:</span> Cơ sở dữ liệu Cloud Firestore đạt hạn mức đọc gói miễn phí Spark. Dữ liệu đang được đồng bộ thời gian thực mượt mà qua mạng nội bộ và các tab.
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <a
+                href={FIRESTORE_DATABASE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-slate-950 hover:bg-slate-900 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] flex items-center space-x-1 shadow-2xs transition-colors"
+              >
+                <span>Nâng cấp Firestore</span>
+                <ExternalLink className="w-3 h-3 ml-0.5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowQuotaBanner(false)}
+                title="Đóng thông báo"
+                className="p-1 hover:bg-amber-600/30 rounded-md transition-colors cursor-pointer text-slate-950"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable View Container */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-20 md:pb-8">
@@ -719,6 +864,7 @@ export default function App() {
                   onUpdateStaffHourlyRate={handleUpdateStaffHourlyRate}
                   onReassignStaffBranch={handleReassignStaffBranch}
                   onResetStaffDevice={handleResetDevice}
+                  onlinePresences={onlinePresences}
                 />
               )}
 

@@ -100,12 +100,15 @@ export async function initializeFirestoreDefaults(): Promise<void> {
   }
 }
 
+import { reportFirestoreQuotaStatus } from './syncEngine';
+
 // ----------------- Real-time Firestore Listeners with Graceful Quota Handling ----------------- //
 
 function handleFirestoreError(context: string, err: any) {
   const errMsg = err?.message || String(err);
-  if (errMsg.includes('Quota limit exceeded') || errMsg.includes('resource-exhausted')) {
-    console.warn(`[Firestore Offline Cache Active] ${context}: Quota reached, using local storage cache seamlessly.`);
+  if (errMsg.includes('Quota limit exceeded') || errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded')) {
+    console.warn(`[Firestore Quota Notice] ${context}: Quota reached. Switching seamlessly to Local Realtime Engine.`);
+    reportFirestoreQuotaStatus(true, errMsg);
   } else {
     console.warn(`[Firestore Notice] ${context}:`, errMsg);
   }
@@ -115,13 +118,11 @@ export function subscribeBranches(callback: (branches: Branch[]) => void) {
   try {
     const q = collection(db, COLLECTIONS.BRANCHES);
     return onSnapshot(q, (snapshot) => {
+      reportFirestoreQuotaStatus(false);
       if (!snapshot.empty) {
         const items: Branch[] = [];
         snapshot.forEach((d) => items.push(d.data() as Branch));
         callback(items);
-      } else {
-        // If collection empty on fresh DB, trigger seed
-        initializeFirestoreDefaults();
       }
     }, (err) => {
       handleFirestoreError('Listening to branches', err);
@@ -136,12 +137,11 @@ export function subscribeUsers(callback: (users: User[]) => void) {
   try {
     const q = collection(db, COLLECTIONS.USERS);
     return onSnapshot(q, (snapshot) => {
+      reportFirestoreQuotaStatus(false);
       if (!snapshot.empty) {
         const items: User[] = [];
         snapshot.forEach((d) => items.push(d.data() as User));
         callback(items);
-      } else {
-        initializeFirestoreDefaults();
       }
     }, (err) => {
       handleFirestoreError('Listening to users', err);
@@ -156,6 +156,7 @@ export function subscribeRegistrations(callback: (regs: ShiftRegistration[]) => 
   try {
     const q = collection(db, COLLECTIONS.REGISTRATIONS);
     return onSnapshot(q, (snapshot) => {
+      reportFirestoreQuotaStatus(false);
       const items: ShiftRegistration[] = [];
       snapshot.forEach((d) => items.push(d.data() as ShiftRegistration));
       callback(items);
@@ -172,6 +173,7 @@ export function subscribeAssignments(callback: (assignments: ShiftAssignment[]) 
   try {
     const q = collection(db, COLLECTIONS.ASSIGNMENTS);
     return onSnapshot(q, (snapshot) => {
+      reportFirestoreQuotaStatus(false);
       const items: ShiftAssignment[] = [];
       snapshot.forEach((d) => items.push(d.data() as ShiftAssignment));
       callback(items);
@@ -188,6 +190,7 @@ export function subscribeAttendance(callback: (logs: AttendanceRecord[]) => void
   try {
     const q = collection(db, COLLECTIONS.ATTENDANCE);
     return onSnapshot(q, (snapshot) => {
+      reportFirestoreQuotaStatus(false);
       const items: AttendanceRecord[] = [];
       snapshot.forEach((d) => items.push(d.data() as AttendanceRecord));
       // Sort descending by date & checkInTime
