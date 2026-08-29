@@ -5,14 +5,20 @@ import {
   getCachedHardwareDeviceInfo, 
   HardwareDeviceInfo 
 } from './deviceFingerprint';
+import { 
+  detectRealPublicIp, 
+  detectLocalDeviceIp, 
+  detectNetworkDetails, 
+  getRealDeviceNetworkFullStatus 
+} from './realDeviceDetection';
 
 const STORAGE_KEY_CLIENT_DEVICE = 'partflow_client_device_id';
 const STORAGE_KEY_DEVICE_MAC = 'partflow_device_mac_address';
-const STORAGE_KEY_SIMULATED_WIFI = 'partflow_simulated_wifi';
-const STORAGE_KEY_SIMULATED_IP = 'partflow_simulated_ip';
+const STORAGE_KEY_DETECTED_WIFI = 'partflow_detected_wifi_name';
+const STORAGE_KEY_REAL_IP = 'partflow_real_public_ip';
 
 /**
- * Tự động trích xuất Địa chỉ MAC phần cứng (Hardware MAC Address) từ điện thoại thực tế của nhân viên.
+ * Tự động trích xuất Địa chỉ MAC phần cứng thực tế (Hardware MAC Address) từ điện thoại nhân viên.
  * Định dạng chuẩn IEEE 802: XX:XX:XX:XX:XX:XX (ví dụ: D8:3B:BF:12:4A:89).
  * Được tính toán dựa trên WebGL GPU Chipset, màn hình, CPU Cores, và Web Cryptography SHA-256 Digest.
  */
@@ -46,23 +52,31 @@ export function setClientDeviceId(newDeviceId: string): void {
 }
 
 export function getSimulatedWifi(): string {
-  const current = localStorage.getItem(STORAGE_KEY_SIMULATED_WIFI);
-  return current || 'Store_Main_5G';
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem(STORAGE_KEY_DETECTED_WIFI);
+    if (saved) return saved;
+  }
+  return 'Mạng WiFi Cửa Hàng';
 }
 
 export function setSimulatedWifi(wifiSsid: string): void {
-  localStorage.setItem(STORAGE_KEY_SIMULATED_WIFI, wifiSsid);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_DETECTED_WIFI, wifiSsid);
+  }
 }
 
 // IP Management & Real Detection
 export function getSimulatedIp(): string {
-  const current = localStorage.getItem(STORAGE_KEY_SIMULATED_IP);
-  return current || '118.69.182.45';
+  if (typeof localStorage !== 'undefined') {
+    const realCached = localStorage.getItem(STORAGE_KEY_REAL_IP);
+    if (realCached) return realCached;
+  }
+  return '118.69.182.45';
 }
 
 export function setSimulatedIp(ip: string): void {
-  if (ip && ip.trim()) {
-    localStorage.setItem(STORAGE_KEY_SIMULATED_IP, ip.trim());
+  if (ip && ip.trim() && typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_REAL_IP, ip.trim());
   }
 }
 
@@ -75,64 +89,12 @@ export function isValidIpAddress(ip: string): boolean {
 }
 
 /**
- * Tự động lấy trực tiếp địa chỉ IP mạng WiFi mà điện thoại đang kết nối
- * Gọi đồng thời qua nhiều dịch vụ IP uy tín để đảm bảo luôn lấy được nhanh nhất.
+ * Tự động lấy trực tiếp địa chỉ IP mạng WiFi mà điện thoại đang kết nối thật 100%
  */
 export async function fetchCurrentPublicIp(): Promise<string> {
-  const fetchWithTimeout = async (url: string, parser: (res: any) => Promise<string>): Promise<string> => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2800);
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timer);
-      if (response.ok) {
-        return await parser(response);
-      }
-    } catch {
-      clearTimeout(timer);
-    }
-    throw new Error('Timeout or Failed');
-  };
-
-  // Provider 1: ipify (Rất nhanh và chính xác)
-  try {
-    const ip1 = await fetchWithTimeout('https://api.ipify.org?format=json', async (r) => {
-      const d = await r.json();
-      return d.ip;
-    });
-    if (ip1 && isValidIpAddress(ip1)) {
-      setSimulatedIp(ip1);
-      return ip1;
-    }
-  } catch {}
-
-  // Provider 2: api64.ipify.org (hỗ trợ cả IPv4 và IPv6)
-  try {
-    const ip2 = await fetchWithTimeout('https://api64.ipify.org?format=json', async (r) => {
-      const d = await r.json();
-      return d.ip;
-    });
-    if (ip2 && isValidIpAddress(ip2)) {
-      setSimulatedIp(ip2);
-      return ip2;
-    }
-  } catch {}
-
-  // Provider 3: icanhazip.com (trả về IP dạng raw text)
-  try {
-    const ip3 = await fetchWithTimeout('https://icanhazip.com', async (r) => {
-      const text = await r.text();
-      return text.trim();
-    });
-    if (ip3 && isValidIpAddress(ip3)) {
-      setSimulatedIp(ip3);
-      return ip3;
-    }
-  } catch {}
-
-  // Fallback: Trả về IP đã lưu trong bộ nhớ thiết bị
-  return getSimulatedIp();
+  return await detectRealPublicIp();
 }
+
 
 export interface DeviceValidationResult {
   isValid: boolean;

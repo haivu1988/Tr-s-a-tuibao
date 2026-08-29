@@ -397,8 +397,13 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Real Device Hardware Badge */}
-        <div className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
+        {/* Real Network IP & Hardware Badge */}
+        <div className="hidden lg:flex items-center space-x-2 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
+          <Globe className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span className="font-mono text-[11px] text-slate-600" title="Địa chỉ IP mạng WiFi đang kết nối thực tế">
+            IP: <strong className="text-slate-900">{currentSimulatedIp}</strong>
+          </span>
+          <span className="text-slate-300">•</span>
           <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           <span className="font-mono text-[11px] font-bold text-slate-800" title={`MAC Phần Cứng: ${currentDeviceId}`}>
             {currentDeviceId}
