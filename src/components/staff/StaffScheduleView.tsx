@@ -15,15 +15,22 @@ import {
   CheckCircle2, 
   Download, 
   Building2,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { getSolarDateInfo, getSolarWeekRangeText } from '../../utils/solarCalendar';
+import { 
+  getSolarDateInfo, 
+  getSolarWeekRangeText, 
+  getAvailableSolarWeeks 
+} from '../../utils/solarCalendar';
 
 interface StaffScheduleViewProps {
   currentUser: User;
   branches: Branch[];
   allStaff: User[];
   weekId: string;
+  onSelectWeek?: (weekId: string) => void;
   assignments: ShiftAssignment[];
 }
 
@@ -32,10 +39,16 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
   branches = [],
   allStaff = [],
   weekId,
+  onSelectWeek,
   assignments = [],
 }) => {
   const [viewMode, setViewMode] = useState<'my_only' | 'full_roster'>('my_only');
-  const currentBranch = branches?.find((b) => b.id === currentUser.branchId) || branches?.[0] || {
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(
+    currentUser.branchId || branches?.[0]?.id || 'cn_quan1'
+  );
+
+  const availableWeeks = getAvailableSolarWeeks();
+  const currentBranch = branches?.find((b) => b.id === selectedBranchId) || branches?.[0] || {
     id: 'cn_quan1',
     name: 'Chi Nhánh 1 - Quận 1',
     shortName: 'Quận 1',
@@ -51,14 +64,27 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
   const todayKey = dayKeyMap[dayIndex];
   const [selectedMobileDay, setSelectedMobileDay] = useState<DayOfWeek>(todayKey || 'mon');
 
-  // Filter assignments for this staff's branch
+  // Filter assignments for selected branch and selected solar week
   const branchAssignments = assignments.filter(
-    (a) => a.weekId === weekId && (a.branchId === currentUser.branchId || !a.branchId)
+    (a) => a.weekId === weekId && (a.branchId === selectedBranchId || (!a.branchId && selectedBranchId === currentUser.branchId))
   );
 
   const myAssignments = branchAssignments.filter(
     (a) => a.assignedUserIds.includes(currentUser.id)
   );
+
+  // Quick next/prev week navigators
+  const currentWeekIdx = availableWeeks.findIndex((w) => w.weekId === weekId);
+  const handlePrevWeek = () => {
+    if (onSelectWeek && currentWeekIdx > 0) {
+      onSelectWeek(availableWeeks[currentWeekIdx - 1].weekId);
+    }
+  };
+  const handleNextWeek = () => {
+    if (onSelectWeek && currentWeekIdx < availableWeeks.length - 1) {
+      onSelectWeek(availableWeeks[currentWeekIdx + 1].weekId);
+    }
+  };
 
   const handleExportICS = () => {
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PartFlow//Staff Schedule//VI\n";
@@ -88,31 +114,105 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-16 md:pb-6">
-      {/* Header Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl shrink-0">
-            <CalendarDays className="w-5 h-5 sm:w-6 sm:h-6" />
+      {/* Control Bar: Solar Calendar Week Selector, Branch Picker & View Switch */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Left: Title & Solar Calendar Range & Branch */}
+        <div className="space-y-2">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl shrink-0">
+              <CalendarDays className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-slate-800 flex items-center gap-2">
+                <span>Lịch Làm Việc (Dương Lịch)</span>
+                {weekId === '2026-W35' ? (
+                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                    Tuần này
+                  </span>
+                ) : weekId > '2026-W35' ? (
+                  <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                    Tuần tới
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                    Lịch cũ
+                  </span>
+                )}
+              </h2>
+              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                <span className="font-bold text-slate-800 flex items-center text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600 inline" />
+                  {solarRange}
+                </span>
+                <span>•</span>
+                <span>
+                  Bạn có <strong className="text-emerald-700">{myAssignments.length} ca</strong> ({myAssignments.length * 5} giờ) tại {currentBranch.shortName}
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg sm:text-xl font-black text-slate-800">
-              Lịch Làm Việc Chính Thức (Dương Lịch)
-            </h2>
-            <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
-              <span className="font-semibold text-slate-700 flex items-center">
-                <Building2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                {currentBranch.name}
-              </span>
-              <span>•</span>
-              <span className="font-bold text-slate-800">{solarRange}</span>
-              <span>•</span>
-              <span>Bạn có <strong className="text-emerald-700">{myAssignments.length} ca</strong> ({myAssignments.length * 5} giờ)</span>
+
+          {/* Branch & Week Selection Pills */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {/* Branch Selector */}
+            <div className="flex items-center space-x-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-slate-500 font-medium">Chi nhánh:</span>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-1"
+              >
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.shortName} {b.id === currentUser.branchId ? '(Quán của tôi)' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Toggle Switch */}
+        {/* Right: Week Selector Controls & View Mode Switches */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Week Selection with Prev / Next buttons */}
+          {onSelectWeek && (
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                disabled={currentWeekIdx <= 0}
+                title="Tuần trước"
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <select
+                value={weekId}
+                onChange={(e) => onSelectWeek(e.target.value)}
+                className="text-xs font-bold text-slate-800 bg-transparent px-2 py-1 focus:outline-none cursor-pointer max-w-[210px] sm:max-w-none"
+              >
+                {availableWeeks.map((w) => (
+                  <option key={w.weekId} value={w.weekId}>
+                    {w.label}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                disabled={currentWeekIdx >= availableWeeks.length - 1}
+                title="Tuần tiếp theo"
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Toggle Switch: My Only vs Whole Branch */}
           <div className="bg-slate-100 p-1 rounded-xl flex items-center text-xs font-bold text-slate-700 border border-slate-200">
             <button
               onClick={() => setViewMode('my_only')}
@@ -138,7 +238,8 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
 
           <button
             onClick={handleExportICS}
-            className="px-3.5 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md transition-colors flex items-center space-x-1.5 cursor-pointer"
+            title="Tải lịch về điện thoại / Google Calendar (.ics)"
+            className="px-3 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md transition-colors flex items-center space-x-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Xuất .ics</span>

@@ -965,6 +965,7 @@ export default function App() {
                   branches={branches}
                   allStaff={users}
                   weekId={weekId}
+                  onSelectWeek={setWeekId}
                   assignments={assignments}
                 />
               )}
