@@ -93,9 +93,16 @@ export const AutoScheduleModal: React.FC<AutoScheduleModalProps> = ({
         <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
           {/* Rules Banner */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
-            <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
-              <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-600" />
-              <span>Quy tắc chia ca tự động cho {branch.shortName}:</span>
+            <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+              <div className="flex items-center">
+                <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-600" />
+                <span>Quy tắc chia ca tự động thông minh cho {branch.shortName}:</span>
+              </div>
+              {previewResult.stats.fairnessSummary && (
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  ⚖️ Đã cân bằng đều: ~{previewResult.stats.fairnessSummary.avgShifts} ca/NV
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-start space-x-2">
@@ -103,8 +110,8 @@ export const AutoScheduleModal: React.FC<AutoScheduleModalProps> = ({
                   1
                 </span>
                 <div>
-                  <div className="font-bold text-slate-800">Tối thiểu 2 NV/Ca</div>
-                  <div className="text-slate-500 text-[11px]">3 ca/ngày (8-13h, 13-18h, 18-23h)</div>
+                  <div className="font-bold text-slate-800">Chia Đều Ca (Same Same Nhau)</div>
+                  <div className="text-slate-500 text-[11px]">Cân bằng số ca giữa các nhân viên, chênh lệch tối đa 1 ca</div>
                 </div>
               </div>
 
@@ -113,8 +120,8 @@ export const AutoScheduleModal: React.FC<AutoScheduleModalProps> = ({
                   2
                 </span>
                 <div>
-                  <div className="font-bold text-slate-800">Cấm làm 3 ca/ngày</div>
-                  <div className="text-slate-500 text-[11px]">Tuyệt đối không phân 3 ca cho 1 NV</div>
+                  <div className="font-bold text-slate-800">Ưu Tiên 1 Ca/Ngày & Cấm 3 Ca</div>
+                  <div className="text-slate-500 text-[11px]">Tối đa 2 ca/ngày khi thiếu người, tuyệt đối không 3 ca/ngày</div>
                 </div>
               </div>
 
@@ -147,21 +154,23 @@ export const AutoScheduleModal: React.FC<AutoScheduleModalProps> = ({
             </div>
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="text-[11px] font-semibold text-slate-500">Tỉ lệ 1 ca / ngày</div>
-              <div className="text-xl font-extrabold text-blue-600 mt-1">
-                {previewResult.stats.singleShiftDaysCount} ngày
+              <div className="text-[11px] font-semibold text-slate-500">Mức cân bằng số ca</div>
+              <div className="text-xl font-extrabold text-emerald-700 mt-1">
+                {previewResult.stats.fairnessSummary?.minShifts}-{previewResult.stats.fairnessSummary?.maxShifts} ca
               </div>
-              <div className="text-[10px] text-slate-400">Ưu tiên tối đa</div>
+              <div className="text-[10px] text-emerald-600 font-medium">
+                {previewResult.stats.fairnessSummary?.isBalanced ? '✓ Rất đồng đều (~same same)' : 'Theo số ca đã đăng ký'}
+              </div>
             </div>
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="text-[11px] font-semibold text-slate-500">Làm 2 ca & 3 ca</div>
-              <div className="text-xl font-extrabold text-slate-800 mt-1 flex items-center space-x-2">
-                <span className="text-amber-600">{previewResult.stats.doubleShiftDaysCount}</span>
+              <div className="text-[11px] font-semibold text-slate-500">Tỉ lệ 1 ca & 2 ca/ngày</div>
+              <div className="text-xl font-extrabold text-slate-800 mt-1 flex items-center space-x-1.5">
+                <span className="text-blue-600">{previewResult.stats.singleShiftDaysCount}</span>
                 <span className="text-slate-300">/</span>
-                <span className="text-emerald-600">{previewResult.stats.tripleShiftDaysCount} (0%)</span>
+                <span className="text-amber-600 text-sm font-semibold">{previewResult.stats.doubleShiftDaysCount} ngày</span>
               </div>
-              <div className="text-[10px] text-slate-400">0 vi phạm 3 ca</div>
+              <div className="text-[10px] text-emerald-600">0 vi phạm 3 ca</div>
             </div>
           </div>
 

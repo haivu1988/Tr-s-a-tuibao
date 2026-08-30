@@ -233,7 +233,10 @@ export async function scanDeviceHardwareProfile(): Promise<HardwareDeviceInfo> {
 
   const hashHex = await computeSha256(rawSeed);
   const macAddress = hashToMacAddress(hashHex, device.osName);
-  const hardwareKey = `HW-${device.deviceName.split(' ')[0].toUpperCase()}-${hashHex.substring(0, 4).toUpperCase()}-${hashHex.substring(4, 8).toUpperCase()}`;
+  
+  // Tạo Mã Máy Điện Thoại duy nhất chuẩn hóa (Ví dụ: DEV-IPHONE-8F3A-C429, DEV-SAMSUNG-9B21-EE40)
+  const devicePrefix = device.deviceName.replace(/[^A-Za-z0-9]/g, '').substring(0, 8).toUpperCase() || 'PHONE';
+  const hardwareKey = `DEV-${devicePrefix}-${hashHex.substring(0, 4).toUpperCase()}-${hashHex.substring(4, 8).toUpperCase()}`;
 
   const summary = `${device.deviceName} • ${gpu.renderer} • ${cpuCores} CPU Cores • ${width}x${height}px`;
 
@@ -271,6 +274,45 @@ export async function scanDeviceHardwareProfile(): Promise<HardwareDeviceInfo> {
   }
 
   return info;
+}
+
+/**
+ * Lấy Mã Máy Điện Thoại thực tế (Đồng bộ - trả về ngay lập tức dạng DEV-IPHONE-XXXX-XXXX)
+ */
+export function getRealDeviceHardwareKeySync(): string {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem(STORAGE_KEY_HW_KEY) || localStorage.getItem('partflow_client_device_id');
+    if (saved && saved.startsWith('DEV-')) {
+      return saved.trim().toUpperCase();
+    }
+  }
+
+  // Nếu chưa có trong cache, tính toán ngay tức thì từ các thông số vật lý
+  const gpu = getWebGlHardwareInfo();
+  const device = detectDeviceModelAndOs();
+  const width = typeof window !== 'undefined' ? window.screen?.width || 390 : 390;
+  const height = typeof window !== 'undefined' ? window.screen?.height || 844 : 844;
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 6 : 6;
+  const pixelRatio = typeof window !== 'undefined' ? window.devicePixelRatio || 3 : 3;
+
+  const raw = `${device.osName}_${device.deviceName}_${gpu.renderer}_${width}x${height}_${cores}c_${pixelRatio}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+    hash |= 0;
+  }
+
+  const hexHash = Math.abs(hash).toString(16).padStart(8, '0').toUpperCase();
+  const devicePrefix = device.deviceName.replace(/[^A-Za-z0-9]/g, '').substring(0, 8).toUpperCase() || 'PHONE';
+  const generatedKey = `DEV-${devicePrefix}-${hexHash.substring(0, 4)}-${hexHash.substring(4, 8)}`;
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_HW_KEY, generatedKey);
+      localStorage.setItem('partflow_client_device_id', generatedKey);
+    } catch {}
+  }
+  return generatedKey;
 }
 
 /**

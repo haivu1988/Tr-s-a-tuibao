@@ -405,11 +405,11 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
           <span className="text-slate-300">•</span>
           <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="font-mono text-[11px] font-bold text-slate-800" title={`MAC Phần Cứng: ${currentDeviceId}`}>
+          <span className="font-mono text-[11px] font-bold text-slate-800" title={`Mã Máy Điện Thoại: ${currentDeviceId}`}>
             {currentDeviceId}
           </span>
           <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
-            Chính Chủ
+            Mã Máy
           </span>
         </div>
 

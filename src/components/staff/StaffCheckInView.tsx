@@ -104,12 +104,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Validation against Branch Pinned WiFi & IP
-  const isWifiValid = 
-    currentSimulatedWifi.toLowerCase().trim() === currentBranch.pinnedWifiSsid.toLowerCase().trim() ||
-    currentSimulatedWifi.toLowerCase().includes(currentBranch.pinnedWifiSsid.toLowerCase()) ||
-    currentSimulatedWifi === wifiConfig.primarySsid;
-
+  // Validation against Branch Pinned IP & Hardware Device Code
   const ipValidation = validateBranchWifiIp(currentSimulatedIp, currentBranch);
   const deviceValidation = validateDeviceForUser(currentUser, currentDeviceId);
 
@@ -119,18 +114,10 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
   );
 
   const handlePerformCheckIn = () => {
-    if (!isWifiValid) {
-      setFeedback({
-        type: 'error',
-        message: `WiFi hiện tại ("${currentSimulatedWifi}") không đúng với WiFi đã ghim của ${currentBranch.name} ("${currentBranch.pinnedWifiSsid}"). Vui lòng kết nối đúng mạng WiFi!`,
-      });
-      return;
-    }
-
     if (!ipValidation.isValid) {
       setFeedback({
         type: 'error',
-        message: ipValidation.errorMessage || `Địa chỉ IP mạng (${currentSimulatedIp}) không khớp với IP đã ghim của ${currentBranch.shortName} (${currentBranch.pinnedWifiIp}).`,
+        message: ipValidation.errorMessage || `Địa chỉ IP mạng WiFi (${currentSimulatedIp}) không khớp với IP đã ghim của ${currentBranch.shortName} (${currentBranch.pinnedWifiIp}). Vui lòng kết nối đúng mạng WiFi của quán!`,
       });
       return;
     }
@@ -166,7 +153,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
       shiftType: selectedShift,
       checkInTime: timeStr,
       checkOutTime: null,
-      wifiSsid: currentSimulatedWifi,
+      wifiSsid: `IP: ${currentSimulatedIp}`,
       wifiIp: currentSimulatedIp,
       pinnedWifiIp: currentBranch.pinnedWifiIp,
       isIpValid: true,
@@ -182,8 +169,8 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
     setFeedback({
       type: 'success',
       message: deviceValidation.isFirstRegistration
-        ? `Đã Check-in thành công tại ${currentBranch.shortName}! Mã máy (${currentDeviceId}) và IP (${currentSimulatedIp}) đã được duyệt hợp lệ.`
-        : `Check-in ${SHIFT_DEFINITIONS[selectedShift].name} tại ${currentBranch.shortName} thành công lúc ${timeStr} (IP: ${currentSimulatedIp})!`,
+        ? `Đã Check-in thành công tại ${currentBranch.shortName}! Mã máy (${currentDeviceId}) và IP (${currentSimulatedIp}) đã được duyệt hợp lệ và khóa vào tài khoản.`
+        : `Check-in ${SHIFT_DEFINITIONS[selectedShift].name} tại ${currentBranch.shortName} thành công lúc ${timeStr} (IP WiFi: ${currentSimulatedIp})!`,
     });
 
     try {
@@ -270,56 +257,16 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
             </h3>
           </div>
 
-          {/* WiFi Verification Row */}
-          <div
-            className={`p-4 rounded-xl border flex items-start space-x-3 ${
-              isWifiValid
-                ? 'bg-emerald-50/70 border-emerald-300'
-                : 'bg-rose-50/70 border-rose-300'
-            }`}
-          >
-            <div
-              className={`p-2 rounded-lg ${
-                isWifiValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
-              }`}
-            >
-              <Wifi className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 flex items-center">
-                  <Pin className="w-3 h-3 mr-1 text-emerald-600" />
-                  WiFi Chi Nhánh ({currentBranch.shortName})
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    isWifiValid
-                      ? 'bg-emerald-200 text-emerald-800'
-                      : 'bg-rose-200 text-rose-800'
-                  }`}
-                >
-                  {isWifiValid ? 'Hợp lệ' : 'Không hợp lệ'}
-                </span>
-              </div>
-              <div className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">
-                Đang kết nối: "{currentSimulatedWifi}"
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                WiFi đã ghim: <span className="font-mono font-semibold text-emerald-700">{currentBranch.pinnedWifiSsid}</span>
-              </p>
-            </div>
-          </div>
-
           {/* IP Address Verification Row */}
           <div
-            className={`p-4 rounded-xl border flex items-start space-x-3 ${
+            className={`p-4 rounded-xl border flex items-start space-x-3 transition-all ${
               ipValidation.isValid
-                ? 'bg-emerald-50/70 border-emerald-300'
-                : 'bg-rose-50/70 border-rose-300'
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-xs'
+                : 'bg-rose-50/70 border-rose-300 shadow-xs'
             }`}
           >
             <div
-              className={`p-2 rounded-lg ${
+              className={`p-2.5 rounded-xl ${
                 ipValidation.isValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
               }`}
             >
@@ -328,8 +275,8 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-900 flex items-center">
-                  <Globe className="w-3 h-3 mr-1 text-emerald-600" />
-                  Địa Chỉ IP WiFi Quán
+                  <Globe className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                  Địa Chỉ IP WiFi Quán ({currentBranch.shortName})
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -338,28 +285,28 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
                       : 'bg-rose-200 text-rose-800'
                   }`}
                 >
-                  {ipValidation.isValid ? 'Khớp IP Ghim' : 'Sai Địa Chỉ IP'}
+                  {ipValidation.isValid ? '✓ Đúng IP WiFi Quán' : '✗ Sai IP Mạng'}
                 </span>
               </div>
-              <div className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">
-                IP hiện tại: {currentSimulatedIp}
+              <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate">
+                IP điện thoại đang dùng: <span className="text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">{currentSimulatedIp}</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                IP ghim quán ({currentBranch.shortName}): <span className="font-mono font-bold text-emerald-700">{currentBranch.pinnedWifiIp || 'Chưa thiết lập'}</span>
+              <p className="text-[11px] text-slate-500 mt-1">
+                IP ghim của {currentBranch.shortName}: <span className="font-mono font-bold text-slate-800">{currentBranch.pinnedWifiIp || 'Chưa thiết lập'}</span>
               </p>
             </div>
           </div>
 
-          {/* Device MAC Address Verification Row */}
+          {/* Hardware Device Key Verification Row */}
           <div
-            className={`p-4 rounded-xl border flex items-start space-x-3 ${
+            className={`p-4 rounded-xl border flex items-start space-x-3 transition-all ${
               deviceValidation.isValid
-                ? 'bg-emerald-50/70 border-emerald-300'
-                : 'bg-rose-50/70 border-rose-300'
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-xs'
+                : 'bg-rose-50/70 border-rose-300 shadow-xs'
             }`}
           >
             <div
-              className={`p-2 rounded-lg ${
+              className={`p-2.5 rounded-xl ${
                 deviceValidation.isValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
               }`}
             >
@@ -368,7 +315,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-1.5">
-                  <span className="text-xs font-bold text-slate-900">Địa chỉ MAC phần cứng điện thoại</span>
+                  <span className="text-xs font-bold text-slate-900">Mã Máy Điện Thoại Phần Cứng</span>
                   {hwInfo && (
                     <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-md">
                       📱 {hwInfo.deviceName}
@@ -385,30 +332,30 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
                   }`}
                 >
                   {deviceValidation.isFirstRegistration
-                    ? 'Lần đầu (Tự khóa MAC máy này)'
+                    ? 'Lần đầu (Tự khóa Mã Máy này)'
                     : deviceValidation.isValid
-                    ? 'Khớp MAC máy chính chủ'
-                    : 'Sai MAC điện thoại'}
+                    ? '✓ Khớp Mã Máy Chính Chủ'
+                    : '✗ Sai Điện Thoại'}
                 </span>
               </div>
               <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate flex items-center space-x-2">
-                <span>MAC máy: {currentDeviceId}</span>
+                <span>Mã máy: <strong className="text-emerald-800 bg-emerald-100/60 px-1.5 py-0.5 rounded">{currentDeviceId}</strong></span>
                 <span className="text-[9px] font-sans font-normal text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                  🔒 Web Crypto SHA-256
+                  🔒 SHA-256 Digest
                 </span>
               </div>
               {hwInfo && (
                 <div className="text-[10.5px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
-                  <span>GPU: <strong className="text-slate-700">{hwInfo.gpuRenderer}</strong></span>
+                  <span>Chip/GPU: <strong className="text-slate-700">{hwInfo.gpuRenderer}</strong></span>
                   <span>•</span>
                   <span>CPU: <strong className="text-slate-700">{hwInfo.cpuCores} Cores</strong></span>
                 </div>
               )}
               <p className="text-[11px] text-slate-500 mt-1">
                 {currentUser.registeredDeviceId ? (
-                  <>MAC đã khóa: <span className="font-mono font-semibold text-emerald-700">{currentUser.registeredDeviceId}</span></>
+                  <>Mã máy đã khóa: <span className="font-mono font-semibold text-emerald-700">{currentUser.registeredDeviceId}</span></>
                 ) : (
-                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Địa chỉ MAC phần cứng từ chiếc điện thoại này sẽ được tự động khóa vĩnh viễn vào tài khoản của bạn khi bấm Check-in.</span>
+                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Mã máy phần cứng từ chiếc điện thoại này sẽ được tự động khóa vĩnh viễn vào tài khoản của bạn khi bấm Check-in.</span>
                 )}
               </p>
             </div>
@@ -418,10 +365,10 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
             <div className="font-bold text-slate-800 flex items-center">
               <Lock className="w-3.5 h-3.5 mr-1 text-slate-500" />
-              Chính sách bảo mật chống gian lận
+              Quy định bảo mật điểm danh
             </div>
             <p>
-              Mỗi nhân viên chỉ được sử dụng 1 thiết bị điện thoại cố định và phải kết nối đúng WiFi đã ghim của chi nhánh mình trực.
+              Nhân viên chỉ được chấm công khi điện thoại kết nối đúng IP mạng WiFi quán và sử dụng đúng chiếc điện thoại có Mã Máy đã đăng ký.
             </p>
           </div>
         </div>
@@ -516,9 +463,9 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
               <button
                 type="button"
                 onClick={handlePerformCheckIn}
-                disabled={!isWifiValid || !ipValidation.isValid || !deviceValidation.isValid}
+                disabled={!ipValidation.isValid || !deviceValidation.isValid}
                 className={`w-full py-3.5 font-black text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 ${
-                  isWifiValid && ipValidation.isValid && deviceValidation.isValid
+                  ipValidation.isValid && deviceValidation.isValid
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}

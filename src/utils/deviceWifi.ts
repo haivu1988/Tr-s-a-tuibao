@@ -1,5 +1,6 @@
 import { WifiStoreConfig, User, Branch } from '../types';
 import { 
+  getRealDeviceHardwareKeySync,
   getRealDeviceHardwareMacSync, 
   scanDeviceHardwareProfile, 
   getCachedHardwareDeviceInfo, 
@@ -13,22 +14,26 @@ import {
 } from './realDeviceDetection';
 
 const STORAGE_KEY_CLIENT_DEVICE = 'partflow_client_device_id';
-const STORAGE_KEY_DEVICE_MAC = 'partflow_device_mac_address';
+const STORAGE_KEY_HW_KEY = 'partflow_hardware_device_key';
 const STORAGE_KEY_DETECTED_WIFI = 'partflow_detected_wifi_name';
 const STORAGE_KEY_REAL_IP = 'partflow_real_public_ip';
 
 /**
- * Tự động trích xuất Địa chỉ MAC phần cứng thực tế (Hardware MAC Address) từ điện thoại nhân viên.
- * Định dạng chuẩn IEEE 802: XX:XX:XX:XX:XX:XX (ví dụ: D8:3B:BF:12:4A:89).
+ * Tự động trích xuất Mã Máy Điện Thoại thực tế (Hardware Device Key) từ điện thoại nhân viên.
+ * Định dạng: DEV-[THIẾT BỊ]-[4 KÝ TỰ]-[4 KÝ TỰ] (ví dụ: DEV-IPHONE-8F3A-C429, DEV-SAMSUNG-9B21-EE40).
  * Được tính toán dựa trên WebGL GPU Chipset, màn hình, CPU Cores, và Web Cryptography SHA-256 Digest.
  */
-export function getDeviceMacAddress(): string {
-  return getRealDeviceHardwareMacSync();
+export function getDeviceHardwareKey(): string {
+  return getRealDeviceHardwareKeySync();
 }
 
-// Giữ lại hàm tương thích ngược getClientDeviceId
+export function getDeviceMacAddress(): string {
+  return getRealDeviceHardwareKeySync();
+}
+
+// Lấy mã máy phần cứng của điện thoại hiện tại
 export function getClientDeviceId(): string {
-  return getRealDeviceHardwareMacSync();
+  return getRealDeviceHardwareKeySync();
 }
 
 /**
@@ -43,11 +48,11 @@ export function getCachedDeviceHardwareInfo(): HardwareDeviceInfo | null {
 }
 
 export function setClientDeviceId(newDeviceId: string): void {
-  const cleanMac = newDeviceId.trim().toUpperCase();
+  const cleanKey = newDeviceId.trim().toUpperCase();
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY_DEVICE_MAC, cleanMac);
-    localStorage.setItem(STORAGE_KEY_CLIENT_DEVICE, cleanMac);
-    localStorage.setItem('partflow_hardware_device_mac', cleanMac);
+    localStorage.setItem(STORAGE_KEY_CLIENT_DEVICE, cleanKey);
+    localStorage.setItem(STORAGE_KEY_HW_KEY, cleanKey);
+    localStorage.setItem('partflow_device_mac_address', cleanKey);
   }
 }
 
@@ -109,7 +114,7 @@ export function validateDeviceForUser(user: User, currentDeviceId: string): Devi
   const registeredClean = (user.registeredDeviceId || '').trim().toUpperCase();
 
   if (!registeredClean) {
-    // Lần đầu check-in: Địa chỉ MAC máy này sẽ được khóa vĩnh viễn với nhân viên
+    // Lần đầu check-in: Mã máy điện thoại này sẽ được khóa vĩnh viễn với nhân viên
     return {
       isValid: true,
       isFirstRegistration: true,
@@ -132,7 +137,7 @@ export function validateDeviceForUser(user: User, currentDeviceId: string): Devi
     isFirstRegistration: false,
     registeredDeviceId: user.registeredDeviceId || null,
     currentDeviceId: currentClean,
-    errorMessage: `Địa chỉ MAC máy hiện tại (${currentClean}) không khớp với địa chỉ MAC máy đã đăng ký (${user.registeredDeviceId}). Mỗi nhân viên chỉ được sử dụng 1 điện thoại cá nhân. Liên hệ Quản lý để reset nếu bạn vừa đổi điện thoại.`,
+    errorMessage: `Mã máy hiện tại (${currentClean}) không khớp với Mã máy đã đăng ký (${user.registeredDeviceId}). Mỗi nhân viên chỉ được sử dụng đúng 1 chiếc điện thoại cá nhân chính chủ. Liên hệ Quản lý để mở khóa nếu bạn vừa đổi điện thoại.`,
   };
 }
 

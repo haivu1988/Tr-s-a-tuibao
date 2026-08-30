@@ -80,35 +80,22 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   );
 
   const deviceValidation = validateDeviceForUser(currentUser, currentDeviceId);
-  const isWifiValid =
-    currentSimulatedWifi.toLowerCase().trim() === currentBranch.pinnedWifiSsid.toLowerCase().trim() ||
-    currentSimulatedWifi.toLowerCase().includes(currentBranch.pinnedWifiSsid.toLowerCase()) ||
-    currentSimulatedWifi === wifiConfig.primarySsid;
-
   const ipValidation = validateBranchWifiIp(currentSimulatedIp, currentBranch);
 
   const handleCheckIn = () => {
     setError('');
     setSuccessMsg('');
 
-    // Verify WiFi against pinned branch wifi
-    if (!isWifiValid) {
-      setError(
-        `Chấm công không thành công: WiFi hiện tại (${currentSimulatedWifi}) không phải là WiFi đã ghim của ${currentBranch.name} (${currentBranch.pinnedWifiSsid}).`
-      );
-      return;
-    }
-
     // Verify IP against pinned branch IP
     if (!ipValidation.isValid) {
       setError(
         ipValidation.errorMessage ||
-          `Địa chỉ IP WiFi (${currentSimulatedIp}) không khớp với IP đã ghim của ${currentBranch.shortName} (${currentBranch.pinnedWifiIp}).`
+          `Địa chỉ IP WiFi (${currentSimulatedIp}) không khớp với IP đã ghim của ${currentBranch.shortName} (${currentBranch.pinnedWifiIp}). Vui lòng kết nối đúng WiFi quán!`
       );
       return;
     }
 
-    // Verify Device
+    // Verify Device Hardware Code
     if (!deviceValidation.isValid) {
       setError(
         deviceValidation.errorMessage ||
@@ -145,7 +132,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       shiftType: selectedShift,
       checkInTime: timeStr,
       checkOutTime: null,
-      wifiSsid: currentSimulatedWifi,
+      wifiSsid: `IP: ${currentSimulatedIp}`,
       wifiIp: currentSimulatedIp,
       pinnedWifiIp: currentBranch.pinnedWifiIp,
       isIpValid: true,
@@ -169,7 +156,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
     setSuccessMsg(
       deviceValidation.isFirstRegistration
         ? `Đã đăng ký Mã máy (${currentDeviceId}) và Check-in IP (${currentSimulatedIp}) thành công tại ${currentBranch.shortName} lúc ${timeStr}!`
-        : `Check-in thành công tại ${currentBranch.shortName} lúc ${timeStr} (IP: ${currentSimulatedIp})!`
+        : `Check-in thành công tại ${currentBranch.shortName} lúc ${timeStr} (IP WiFi: ${currentSimulatedIp})!`
     );
 
     setTimeout(() => {
@@ -180,14 +167,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   const handleCheckOut = () => {
     if (!existingActiveRecord) return;
     setError('');
-
-    // WiFi check on checkout
-    if (!isWifiValid) {
-      setError(
-        `Check-out yêu cầu kết nối WiFi đã ghim của ${currentBranch.name} (${currentBranch.pinnedWifiSsid}). Hiện tại: ${currentSimulatedWifi}`
-      );
-      return;
-    }
 
     if (!ipValidation.isValid) {
       setError(
@@ -258,46 +237,13 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
           </div>
 
           {/* Validation Status Badges */}
-          <div className="space-y-2">
-            {/* WiFi validation box */}
-            <div
-              className={`p-3 rounded-xl border flex items-start space-x-3 ${
-                isWifiValid
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
-                  : 'bg-red-50/70 border-red-200 text-red-900'
-              }`}
-            >
-              <Wifi
-                className={`w-5 h-5 shrink-0 mt-0.5 ${
-                  isWifiValid ? 'text-emerald-600' : 'text-red-600'
-                }`}
-              />
-              <div className="text-xs flex-1">
-                <div className="font-bold flex items-center justify-between">
-                  <span>WiFi Hiện Tại: {currentSimulatedWifi}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
-                      isWifiValid
-                        ? 'bg-emerald-200 text-emerald-800'
-                        : 'bg-red-200 text-red-800'
-                    }`}
-                  >
-                    {isWifiValid ? 'Đúng WiFi Đã Ghim' : 'Không Hợp Lệ'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center">
-                  <Pin className="w-3 h-3 mr-1 text-emerald-600 inline" />
-                  WiFi ghim: <span className="font-mono font-semibold ml-1 text-emerald-800">{currentBranch.pinnedWifiSsid}</span>
-                </div>
-              </div>
-            </div>
-
+          <div className="space-y-2.5">
             {/* IP validation box */}
             <div
-              className={`p-3 rounded-xl border flex items-start space-x-3 ${
+              className={`p-3.5 rounded-xl border flex items-start space-x-3 transition-all ${
                 ipValidation.isValid
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
-                  : 'bg-red-50/70 border-red-200 text-red-900'
+                  ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 shadow-xs'
+                  : 'bg-red-50/70 border-red-300 text-red-900 shadow-xs'
               }`}
             >
               <Globe
@@ -307,30 +253,30 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               />
               <div className="text-xs flex-1">
                 <div className="font-bold flex items-center justify-between">
-                  <span>IP Mạng: {currentSimulatedIp}</span>
+                  <span>IP Mạng WiFi: {currentSimulatedIp}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                       ipValidation.isValid
                         ? 'bg-emerald-200 text-emerald-800'
                         : 'bg-red-200 text-red-800'
                     }`}
                   >
-                    {ipValidation.isValid ? 'Khớp IP Ghim Quán' : 'Sai Địa Chỉ IP'}
+                    {ipValidation.isValid ? '✓ Đúng IP WiFi Quán' : '✗ Sai Địa Chỉ IP'}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center">
+                <div className="text-[11px] text-slate-500 mt-1 flex items-center">
                   <Globe className="w-3 h-3 mr-1 text-emerald-600 inline" />
-                  IP ghim ({currentBranch.shortName}): <span className="font-mono font-semibold ml-1 text-emerald-800">{currentBranch.pinnedWifiIp || 'Chưa thiết lập'}</span>
+                  IP ghim ({currentBranch.shortName}): <span className="font-mono font-semibold ml-1 text-slate-800">{currentBranch.pinnedWifiIp || 'Chưa thiết lập'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Device MAC validation box */}
+            {/* Device Hardware Key validation box */}
             <div
-              className={`p-3 rounded-xl border flex items-start space-x-3 ${
+              className={`p-3.5 rounded-xl border flex items-start space-x-3 transition-all ${
                 deviceValidation.isValid
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
-                  : 'bg-red-50/70 border-red-200 text-red-900'
+                  ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 shadow-xs'
+                  : 'bg-red-50/70 border-red-300 text-red-900 shadow-xs'
               }`}
             >
               <Smartphone
@@ -340,9 +286,9 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               />
               <div className="text-xs flex-1">
                 <div className="font-bold flex items-center justify-between">
-                  <span>Địa Chỉ MAC: {currentDeviceId}</span>
+                  <span>Mã Máy: {currentDeviceId}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                       deviceValidation.isFirstRegistration
                         ? 'bg-amber-200 text-amber-800'
                         : deviceValidation.isValid
@@ -351,20 +297,20 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                     }`}
                   >
                     {deviceValidation.isFirstRegistration
-                      ? 'Khóa MAC Lần Đầu'
+                      ? 'Khóa Mã Máy Lần Đầu'
                       : deviceValidation.isValid
-                      ? 'MAC Máy Khớp'
-                      : 'Sai MAC Điện Thoại!'}
+                      ? '✓ Mã Máy Khớp'
+                      : '✗ Sai Điện Thoại!'}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
+                <div className="text-[11px] text-slate-500 mt-1">
                   {deviceValidation.isFirstRegistration ? (
                     <span className="text-amber-700">
-                      *Địa chỉ MAC máy này sẽ tự động được khóa cố định cho tài khoản của bạn khi bấm Check-in.
+                      *Mã máy phần cứng từ chiếc điện thoại này sẽ tự động được khóa cố định cho tài khoản của bạn khi bấm Check-in.
                     </span>
                   ) : (
                     <span>
-                      MAC đã khóa: <span className="font-mono font-bold text-emerald-700">{currentUser.registeredDeviceId}</span>
+                      Mã máy đã khóa: <span className="font-mono font-bold text-emerald-700">{currentUser.registeredDeviceId}</span>
                     </span>
                   )}
                 </div>
@@ -455,9 +401,9 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               <button
                 type="button"
                 onClick={handleCheckIn}
-                disabled={!isWifiValid || !ipValidation.isValid || !deviceValidation.isValid}
+                disabled={!ipValidation.isValid || !deviceValidation.isValid}
                 className={`w-full py-3 rounded-xl text-sm font-bold text-white shadow-md flex items-center justify-center space-x-2 transition-all transform active:scale-98 ${
-                  isWifiValid && ipValidation.isValid && deviceValidation.isValid
+                  ipValidation.isValid && deviceValidation.isValid
                     ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer'
                     : 'bg-slate-300 cursor-not-allowed text-slate-500'
                 }`}
@@ -473,9 +419,9 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               <button
                 type="button"
                 onClick={handleCheckOut}
-                disabled={!isWifiValid || !ipValidation.isValid}
+                disabled={!ipValidation.isValid}
                 className={`w-full py-3 rounded-xl text-sm font-bold text-white shadow-md flex items-center justify-center space-x-2 transition-all transform active:scale-98 ${
-                  isWifiValid && ipValidation.isValid
+                  ipValidation.isValid
                     ? 'bg-rose-600 hover:bg-rose-700 cursor-pointer'
                     : 'bg-slate-300 cursor-not-allowed text-slate-500'
                 }`}

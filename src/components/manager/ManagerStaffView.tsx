@@ -219,13 +219,13 @@ export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
                           {staff.registeredDeviceId ? (
                             <span className="inline-flex items-center space-x-1.5">
                               <span className="font-mono text-[11px] text-emerald-700 font-semibold">
-                                Đã khóa MAC: {staff.registeredDeviceId}
+                                Đã khóa Mã Máy: {staff.registeredDeviceId}
                               </span>
                               {onResetStaffDevice && (
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (window.confirm(`Mở khóa MAC phần cứng cho nhân viên "${staff.name}"? Sau khi mở khóa, nhân viên có thể sử dụng điện thoại mới để check-in.`)) {
+                                    if (window.confirm(`Mở khóa Mã Máy cho nhân viên "${staff.name}"? Sau khi mở khóa, nhân viên có thể sử dụng điện thoại mới để check-in.`)) {
                                       onResetStaffDevice(staff.id);
                                     }
                                   }}
@@ -238,7 +238,7 @@ export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
                             </span>
                           ) : (
                             <span className="italic text-amber-600">
-                              Chưa khóa MAC (Tự động ghim khi Check-in)
+                              Chưa khóa Mã Máy (Tự động ghim khi Check-in)
                             </span>
                           )}
                         </span>
