@@ -53,11 +53,13 @@ export const ManagerAttendanceView: React.FC<ManagerAttendanceViewProps> = ({
 
   const filteredLogs = logs.filter((log) => {
     const matchesBranch = filterBranch === 'all' || log.branchId === filterBranch;
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.deviceId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.wifiSsid.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.wifiIp && log.wifiIp.toLowerCase().includes(searchTerm.toLowerCase()));
+      (log.userName && log.userName.toLowerCase().includes(term)) ||
+      (log.deviceId && log.deviceId.toLowerCase().includes(term)) ||
+      (log.wifiSsid && log.wifiSsid.toLowerCase().includes(term)) ||
+      (log.wifiIp && log.wifiIp.toLowerCase().includes(term)) ||
+      (log.branchName && log.branchName.toLowerCase().includes(term));
 
     const matchesShift = filterShift === 'all' || log.shiftType === filterShift;
     const matchesStatus = filterStatus === 'all' || log.status === filterStatus;
@@ -121,20 +123,20 @@ export const ManagerAttendanceView: React.FC<ManagerAttendanceViewProps> = ({
 
         <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500">WiFi & IP Ghim Quán</span>
+            <span className="text-[11px] font-semibold text-slate-500">📍 GPS Tọa Độ Quán</span>
             <button
               onClick={onOpenWifiModal}
               className="text-[10px] text-emerald-700 font-bold hover:underline cursor-pointer flex items-center space-x-0.5"
             >
               <Pin className="w-3 h-3 text-emerald-600" />
-              <span>Ghim</span>
+              <span>Ghim GPS</span>
             </button>
           </div>
-          <div className="text-xs font-bold text-slate-800 mt-1 font-mono truncate" title={currentBranch.pinnedWifiIp ? `IP: ${currentBranch.pinnedWifiIp}` : currentBranch.pinnedWifiSsid}>
-            🌐 {filterBranch === 'all' ? 'IP từng chi nhánh' : `IP: ${currentBranch.pinnedWifiIp || 'Chưa ghim'}`}
+          <div className="text-xs font-bold text-slate-800 mt-1 font-mono truncate" title={currentBranch.latitude ? `${currentBranch.latitude}, ${currentBranch.longitude}` : 'Chưa ghim'}>
+            📍 {filterBranch === 'all' ? 'Tọa độ từng chi nhánh' : `${currentBranch.latitude?.toFixed(4) || '10.7742'}, ${currentBranch.longitude?.toFixed(4) || '106.7039'}`}
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-400 truncate">
-            {filterBranch === 'all' ? 'Bảo mật kép WiFi + IP' : `WiFi: ${currentBranch.pinnedWifiSsid}`}
+            {filterBranch === 'all' ? 'Định vị chuẩn mét' : `Bán kính cho phép: ±${currentBranch.radiusMeters || 50}m`}
           </div>
         </div>
       </div>
@@ -373,10 +375,22 @@ export const ManagerAttendanceView: React.FC<ManagerAttendanceViewProps> = ({
                     </td>
 
                     <td className="py-3 px-3">
-                      <div className="font-semibold text-slate-800">{shiftDef.name}</div>
+                      <div className="font-semibold text-slate-800 flex items-center space-x-1">
+                        <span>{shiftDef.name}</span>
+                        {log.isShiftAssigned && (
+                          <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.2 rounded-full">
+                            Đúng ca
+                          </span>
+                        )}
+                      </div>
                       <div className="font-mono text-[11px] text-emerald-700 font-bold">
                         {log.checkInTime} → {log.checkOutTime || 'Đang trực...'}
                       </div>
+                      {log.checkInStatusLabel && (
+                        <div className="text-[10px] text-slate-400">
+                          {log.checkInStatusLabel}
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3 px-3">

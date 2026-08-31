@@ -213,7 +213,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <div className="min-w-0 pr-2">
                               <div className="truncate font-semibold">{b.name}</div>
                               <div className="text-[10px] text-slate-400 truncate font-mono">
-                                📌 WiFi: {b.pinnedWifiSsid}
+                                📍 GPS: {b.latitude ? `${b.latitude.toFixed(3)}, ${b.longitude?.toFixed(3)} (±${b.radiusMeters || 50}m)` : 'Chưa ghim'}
                               </div>
                             </div>
                             {activeBranchId === b.id && (

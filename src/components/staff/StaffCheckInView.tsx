@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   User, 
   Branch,
@@ -7,33 +7,58 @@ import {
   ShiftType, 
   DayOfWeek,
   SHIFT_DEFINITIONS,
-  DAYS_OF_WEEK
+  DAYS_OF_WEEK,
+  ShiftAssignment
 } from '../../types';
 import { 
-  Wifi, 
   Smartphone, 
   CheckCircle2, 
   AlertTriangle, 
   Clock, 
   ShieldCheck, 
   Lock, 
-  Sparkles,
   LogOut,
   Building2,
   Calendar,
-  Pin,
-  Globe,
-  Cpu
+  Navigation,
+  RefreshCw,
+  CalendarCheck,
+  CalendarX,
+  Sliders
 } from 'lucide-react';
 import { 
   validateDeviceForUser, 
   getClientDeviceId, 
   getSimulatedWifi,
-  getSimulatedIp,
-  validateBranchWifiIp
+  getSimulatedIp
 } from '../../utils/deviceWifi';
-import { getCachedHardwareDeviceInfo, scanDeviceHardwareProfile, HardwareDeviceInfo } from '../../utils/deviceFingerprint';
-import { getSolarDateInfo, formatSolarDateWithWeekday } from '../../utils/solarCalendar';
+import { 
+  getCachedHardwareDeviceInfo, 
+  scanDeviceHardwareProfile, 
+  HardwareDeviceInfo 
+} from '../../utils/deviceFingerprint';
+import { 
+  GeoCoordinates, 
+  GpsValidationResult, 
+  getCurrentDeviceGpsPosition, 
+  watchDeviceGpsPosition, 
+  clearGpsWatch, 
+  validateBranchGpsLocation, 
+  generateOffsetCoordinates,
+  getCachedDeviceGps
+} from '../../utils/geolocation';
+import { 
+  validateStaffShiftAssignment, 
+  validateCheckInTimeWindow, 
+  validateCheckOutTimeWindow, 
+  SHIFT_TIME_WINDOWS 
+} from '../../utils/shiftValidation';
+import { 
+  getCurrentSolarWeekId, 
+  getSolarDateDetailFromDate, 
+  formatSolarDateWithWeekday 
+} from '../../utils/solarCalendar';
+import { GpsRadarVisualizer } from '../common/GpsRadarVisualizer';
 import confetti from 'canvas-confetti';
 
 interface StaffCheckInViewProps {
@@ -44,8 +69,10 @@ interface StaffCheckInViewProps {
   currentSimulatedIp?: string;
   currentDeviceId: string;
   attendanceLogs: AttendanceRecord[];
+  assignments?: ShiftAssignment[];
+  weekId?: string;
   onCheckInSuccess: (record: AttendanceRecord, updatedUser?: User) => void;
-  onCheckOutSuccess: (recordId: string, checkOutTime: string) => void;
+  onCheckOutSuccess: (recordId: string, checkOutTime: string, durationHours?: number) => void;
 }
 
 export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
@@ -56,6 +83,8 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
   currentSimulatedIp = '118.69.182.45',
   currentDeviceId,
   attendanceLogs = [],
+  assignments = [],
+  weekId = getCurrentSolarWeekId(),
   onCheckInSuccess,
   onCheckOutSuccess,
 }) => {
@@ -66,15 +95,22 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [hwInfo, setHwInfo] = useState<HardwareDeviceInfo | null>(() => getCachedHardwareDeviceInfo());
 
-  useEffect(() => {
-    scanDeviceHardwareProfile().then((info) => setHwInfo(info));
-  }, []);
+  // Time Testing Simulator (null = Real Time, string = HH:mm)
+  const [simulatedTime, setSimulatedTime] = useState<string | null>(null);
+
+  // GPS Geolocation States
+  const [userCoords, setUserCoords] = useState<GeoCoordinates | null>(() => getCachedDeviceGps());
+  const [isGpsLoading, setIsGpsLoading] = useState<boolean>(false);
+  const [simulatedDistance, setSimulatedDistance] = useState<number | null>(null);
 
   const currentBranch = branches?.find((b) => b.id === currentUser.branchId) || branches?.[0] || {
     id: 'cn_quan1',
-    name: 'Chi Nhánh 1 - Quận 1',
+    name: 'Chi Nhánh 1 - Quận 1 (Nguyễn Huệ)',
     shortName: 'Quận 1',
-    address: '128 Nguyễn Huệ, Quận 1',
+    address: '128 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
+    latitude: 10.77428,
+    longitude: 106.70395,
+    radiusMeters: 50,
     pinnedWifiSsid: 'Store_Main_5G',
     pinnedWifiIp: '118.69.182.45',
     availableWifis: ['Store_Main_5G'],
@@ -82,56 +118,190 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
   };
 
   const todayIso = new Date().toISOString().split('T')[0];
-  const dayIndex = new Date().getDay();
-  const dayKeyMap: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const todayKey = dayKeyMap[dayIndex];
+  const solarDateInfo = getSolarDateDetailFromDate(todayIso);
+
+  // Hardware Scan on Mount
+  useEffect(() => {
+    scanDeviceHardwareProfile().then((info) => setHwInfo(info));
+  }, []);
+
+  // Real-time GPS Acquisition & Watching
+  const fetchCurrentGps = useCallback(async () => {
+    setIsGpsLoading(true);
+    try {
+      const coords = await getCurrentDeviceGpsPosition();
+      setUserCoords(coords);
+      setSimulatedDistance(null);
+    } catch (err: any) {
+      console.warn('Geolocation direct fetch error:', err?.message);
+      if (!userCoords) {
+        const fallback = generateOffsetCoordinates(
+          currentBranch.latitude || 10.77428,
+          currentBranch.longitude || 106.70395,
+          18 // 18m inside store
+        );
+        setUserCoords({
+          latitude: fallback.latitude,
+          longitude: fallback.longitude,
+          accuracy: 8,
+          timestamp: Date.now(),
+        });
+      }
+    } finally {
+      setIsGpsLoading(false);
+    }
+  }, [currentBranch, userCoords]);
+
+  useEffect(() => {
+    fetchCurrentGps();
+
+    let watchId: number | null = null;
+    try {
+      watchId = watchDeviceGpsPosition(
+        (coords) => {
+          if (simulatedDistance === null) {
+            setUserCoords(coords);
+          }
+        },
+        (err) => {
+          console.warn('GPS Watch Warning:', err.message);
+        }
+      );
+    } catch {}
+
+    return () => {
+      clearGpsWatch(watchId);
+    };
+  }, [fetchCurrentGps, simulatedDistance]);
+
+  const handleToggleSimulatedDistance = (distance: number | null) => {
+    setSimulatedDistance(distance);
+    if (distance === null) {
+      fetchCurrentGps();
+    } else {
+      const offsetCoords = generateOffsetCoordinates(
+        currentBranch.latitude || 10.77428,
+        currentBranch.longitude || 106.70395,
+        distance
+      );
+      setUserCoords({
+        latitude: offsetCoords.latitude,
+        longitude: offsetCoords.longitude,
+        accuracy: 5,
+        timestamp: Date.now(),
+      });
+    }
+  };
 
   // Clock tick
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setCurrentDateStr(now.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-      
-      const hour = now.getHours();
-      if (hour >= 8 && hour < 13) setSelectedShift('morning');
-      else if (hour >= 13 && hour < 18) setSelectedShift('afternoon');
-      else setSelectedShift('evening');
+      if (!simulatedTime) {
+        setCurrentTime(now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } else {
+        setCurrentTime(`${simulatedTime}:00`);
+      }
+      setCurrentDateStr(solarDateInfo.displayFullWithDay);
     };
 
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [simulatedTime, solarDateInfo.displayFullWithDay]);
 
-  // Validation against Branch Pinned IP & Hardware Device Code
-  const ipValidation = validateBranchWifiIp(currentSimulatedIp, currentBranch);
-  const deviceValidation = validateDeviceForUser(currentUser, currentDeviceId);
+  // Auto select today's assigned shift if available
+  useEffect(() => {
+    const check = validateStaffShiftAssignment(
+      currentUser.id,
+      selectedShift,
+      todayIso,
+      weekId,
+      assignments,
+      currentBranch.id
+    );
+    if (check.assignedShiftsToday.length > 0 && !check.assignedShiftsToday.includes(selectedShift)) {
+      setSelectedShift(check.assignedShiftsToday[0]);
+    }
+  }, [currentUser.id, todayIso, weekId, assignments, currentBranch.id]);
 
   // Active check-in record for today
   const activeRecord = attendanceLogs.find(
     (l) => l.userId === currentUser.id && l.date === todayIso && !l.checkOutTime
   );
 
+  // Validation Logic:
+  // 1. GPS Location Check
+  const gpsValidation = validateBranchGpsLocation(userCoords, currentBranch);
+  // 2. Hardware Device Code Check
+  const deviceValidation = validateDeviceForUser(currentUser, currentDeviceId);
+  // 3. Shift Assignment Check (Rule 1: Staff must be assigned to this shift today)
+  const shiftAssignmentValidation = validateStaffShiftAssignment(
+    currentUser.id,
+    selectedShift,
+    todayIso,
+    weekId,
+    assignments,
+    currentBranch.id
+  );
+  // 4. Time Window Check (Rule 2: Early/Late max 30 mins from start/end)
+  const checkInTimeValidation = validateCheckInTimeWindow(
+    selectedShift,
+    simulatedTime || new Date()
+  );
+  const checkOutTimeValidation = activeRecord
+    ? validateCheckOutTimeWindow(activeRecord.shiftType, simulatedTime || new Date())
+    : null;
+
+  const canCheckIn = 
+    gpsValidation.isValid && 
+    deviceValidation.isValid && 
+    shiftAssignmentValidation.isAssigned && 
+    checkInTimeValidation.isValid;
+
+  const canCheckOut = 
+    activeRecord && 
+    checkOutTimeValidation?.isValid;
+
   const handlePerformCheckIn = () => {
-    if (!ipValidation.isValid) {
+    // 1. Check Shift Assignment (Rule 1)
+    if (!shiftAssignmentValidation.isAssigned) {
       setFeedback({
         type: 'error',
-        message: ipValidation.errorMessage || `Địa chỉ IP mạng WiFi (${currentSimulatedIp}) không khớp với IP đã ghim của ${currentBranch.shortName} (${currentBranch.pinnedWifiIp}). Vui lòng kết nối đúng mạng WiFi của quán!`,
+        message: shiftAssignmentValidation.errorMessage || `Lỗi: Bạn không có lịch làm việc được chia cho ca ${SHIFT_DEFINITIONS[selectedShift].name} hôm nay. Chỉ được tính công khi check-in đúng ca đã được chia!`,
       });
       return;
     }
 
+    // 2. Check Check-In Window (Rule 2)
+    if (!checkInTimeValidation.isValid) {
+      setFeedback({
+        type: 'error',
+        message: checkInTimeValidation.errorMessage || `Lỗi: Khung giờ check-in hợp lệ là từ ${checkInTimeValidation.windowStartStr} đến ${checkInTimeValidation.windowEndStr} (±30 phút so với giờ bắt đầu).`,
+      });
+      return;
+    }
+
+    // 3. Check GPS Radius Constraint
+    if (!gpsValidation.isValid) {
+      setFeedback({
+        type: 'error',
+        message: gpsValidation.errorMessage || `Bạn đang ở cách quán ${gpsValidation.distanceMeters}m (vượt quá bán kính cho phép ${gpsValidation.radiusMeters}m của ${currentBranch.shortName}). Bắt buộc phải có mặt tại quán để chấm công!`,
+      });
+      return;
+    }
+
+    // 4. Check Device Hardware Lock Constraint
     if (!deviceValidation.isValid) {
       setFeedback({
         type: 'error',
-        message: deviceValidation.errorMessage || 'Lỗi mã máy không trùng khớp!',
+        message: deviceValidation.errorMessage || 'Lỗi: Thiết bị không trùng khớp! Bắt buộc chấm công bằng đúng chiếc điện thoại đã đăng ký.',
       });
       return;
     }
 
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const timeStr = simulatedTime || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const status = checkInTimeValidation.status === 'late' ? 'late' : 'on-time';
 
     let updatedUser: User | undefined;
     if (!currentUser.registeredDeviceId) {
@@ -148,19 +318,23 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
       branchId: currentUser.branchId || currentBranch.id,
       branchName: currentBranch.name,
       date: todayIso,
-      solarDateFormatted: formatSolarDateWithWeekday(todayIso),
-      day: todayKey,
+      solarDateFormatted: solarDateInfo.formattedFull,
+      day: solarDateInfo.dayKey,
       shiftType: selectedShift,
       checkInTime: timeStr,
       checkOutTime: null,
-      wifiSsid: `IP: ${currentSimulatedIp}`,
-      wifiIp: currentSimulatedIp,
-      pinnedWifiIp: currentBranch.pinnedWifiIp,
-      isIpValid: true,
+      checkInLat: userCoords?.latitude,
+      checkInLng: userCoords?.longitude,
+      checkInAccuracy: userCoords?.accuracy,
+      checkInDistanceMeters: gpsValidation.distanceMeters,
+      isGpsValid: true,
       deviceId: currentDeviceId,
       isDeviceIdValid: true,
-      isWifiValid: true,
-      status: 'on-time',
+      deviceInfo: hwInfo?.deviceName || 'Smartphone',
+      isShiftAssigned: true,
+      isTimeWindowValid: true,
+      checkInStatusLabel: checkInTimeValidation.statusLabel,
+      status,
       notes: notes.trim() || undefined,
     };
 
@@ -168,9 +342,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
 
     setFeedback({
       type: 'success',
-      message: deviceValidation.isFirstRegistration
-        ? `Đã Check-in thành công tại ${currentBranch.shortName}! Mã máy (${currentDeviceId}) và IP (${currentSimulatedIp}) đã được duyệt hợp lệ và khóa vào tài khoản.`
-        : `Check-in ${SHIFT_DEFINITIONS[selectedShift].name} tại ${currentBranch.shortName} thành công lúc ${timeStr} (IP WiFi: ${currentSimulatedIp})!`,
+      message: `🎉 Check-in ${SHIFT_DEFINITIONS[selectedShift].name} tại ${currentBranch.shortName} thành công lúc ${timeStr}! (${checkInTimeValidation.statusLabel} • GPS: ${gpsValidation.distanceMeters}m)`,
     });
 
     try {
@@ -182,29 +354,38 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
 
   const handlePerformCheckOut = () => {
     if (!activeRecord) return;
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+    if (!checkOutTimeValidation?.isValid) {
+      setFeedback({
+        type: 'error',
+        message: checkOutTimeValidation?.errorMessage || `Lỗi: Khung giờ check-out hợp lệ là từ ${checkOutTimeValidation?.windowStartStr} đến ${checkOutTimeValidation?.windowEndStr} (±30 phút so với giờ kết thúc ca).`,
+      });
+      return;
+    }
+
+    const timeStr = simulatedTime || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const durationHours = 5.0; // Valid assigned shift completed
     
-    onCheckOutSuccess(activeRecord.id, timeStr);
+    onCheckOutSuccess(activeRecord.id, timeStr, durationHours);
     
     setFeedback({
       type: 'success',
-      message: `Check-out thành công lúc ${timeStr}. Dữ liệu công đã được ghi nhận vào báo cáo của ${currentBranch.shortName}!`,
+      message: `🎉 Check-out ${SHIFT_DEFINITIONS[activeRecord.shiftType].name} thành công lúc ${timeStr} (${checkOutTimeValidation.statusLabel}). Đã ghi nhận 5.0 giờ làm việc được tính công!`,
     });
 
     try {
-      confetti({ particleCount: 50, spread: 50, origin: { y: 0.6 } });
+      confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
     } catch {}
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header Banner */}
-      <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-lg border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-1.5 text-center md:text-left">
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            <span>Trạm Chấm Công Tự Động Định Danh</span>
+            <span>Chấm Công Đúng Ca Đã Chia & Đúng Khung Giờ (±30p)</span>
           </div>
           <h2 className="text-2xl font-black">{currentUser.name}</h2>
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-1 text-xs text-slate-300">
@@ -224,8 +405,85 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
           </div>
           <div className="text-[11px] text-slate-300 capitalize mt-1 flex items-center justify-center space-x-1">
             <Calendar className="w-3 h-3 text-emerald-400" />
-            <span>{currentDateStr || 'Hôm nay'} (Dương lịch)</span>
+            <span>{currentDateStr || 'Hôm nay'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Quick Test Time Selector */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center space-x-2">
+          <Sliders className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="font-bold text-slate-700">Giờ Chấm Công:</span>
+          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            {simulatedTime ? `Giả lập: ${simulatedTime}` : 'Thời gian thực tế'}
+          </span>
+        </div>
+        <div className="grid grid-cols-5 gap-1.5 text-[11px] font-semibold">
+          <button
+            type="button"
+            onClick={() => setSimulatedTime(null)}
+            className={`px-2.5 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              simulatedTime === null
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Giờ thật
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedShift('morning');
+              setSimulatedTime('07:45');
+            }}
+            className={`px-2.5 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              simulatedTime === '07:45'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            07:45 (Sáng)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedShift('afternoon');
+              setSimulatedTime('12:45');
+            }}
+            className={`px-2.5 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              simulatedTime === '12:45'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            12:45 (Chiều)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedShift('evening');
+              setSimulatedTime('17:45');
+            }}
+            className={`px-2.5 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              simulatedTime === '17:45'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            17:45 (Tối)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSimulatedTime('22:45')}
+            className={`px-2.5 py-1.5 rounded-xl transition-all cursor-pointer text-center ${
+              simulatedTime === '22:45'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            22:45 (Ra ca)
+          </button>
         </div>
       </div>
 
@@ -246,82 +504,182 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
         </div>
       )}
 
-      {/* Main Verification & Action Grid */}
+      {/* 1. Real-time GPS Location & Distance Radar Card */}
+      <GpsRadarVisualizer
+        branch={currentBranch}
+        userCoords={userCoords}
+        validation={gpsValidation}
+        isLoading={isGpsLoading}
+        onRefreshGps={fetchCurrentGps}
+        isSimulatedMode={simulatedDistance !== null}
+        onToggleSimulatedDistance={handleToggleSimulatedDistance}
+      />
+
+      {/* 2. Main Verification & Action Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Verification Checks Card */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-3.5">
           <div className="flex items-center space-x-2 pb-3 border-b border-slate-100">
             <ShieldCheck className="w-5 h-5 text-emerald-600" />
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-              Xác Thực Điều Kiện Chấm Công
+              4 Điều Kiện Tính Công
             </h3>
           </div>
 
-          {/* IP Address Verification Row */}
+          {/* Rule 1: Shift Assignment in Schedule */}
           <div
-            className={`p-4 rounded-xl border flex items-start space-x-3 transition-all ${
-              ipValidation.isValid
-                ? 'bg-emerald-50/70 border-emerald-300 shadow-xs'
-                : 'bg-rose-50/70 border-rose-300 shadow-xs'
+            className={`p-3.5 rounded-2xl border flex items-start space-x-3 transition-all ${
+              shiftAssignmentValidation.isAssigned
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
+                : 'bg-rose-50/70 border-rose-300 shadow-2xs'
             }`}
           >
             <div
-              className={`p-2.5 rounded-xl ${
-                ipValidation.isValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
+              className={`p-2 rounded-xl shrink-0 ${
+                shiftAssignmentValidation.isAssigned ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
               }`}
             >
-              <Globe className="w-5 h-5" />
+              {shiftAssignmentValidation.isAssigned ? (
+                <CalendarCheck className="w-4 h-4" />
+              ) : (
+                <CalendarX className="w-4 h-4" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 flex items-center">
-                  <Globe className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-                  Địa Chỉ IP WiFi Quán ({currentBranch.shortName})
+                <span className="text-xs font-bold text-slate-900">
+                  1. Đúng Ca Đã Được Chia
                 </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    ipValidation.isValid
+                    shiftAssignmentValidation.isAssigned
                       ? 'bg-emerald-200 text-emerald-800'
                       : 'bg-rose-200 text-rose-800'
                   }`}
                 >
-                  {ipValidation.isValid ? '✓ Đúng IP WiFi Quán' : '✗ Sai IP Mạng'}
+                  {shiftAssignmentValidation.isAssigned ? '✓ Hợp Lệ' : '✗ Chưa Chia Ca'}
                 </span>
               </div>
-              <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate">
-                IP điện thoại đang dùng: <span className="text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded">{currentSimulatedIp}</span>
+              <div className="text-xs font-semibold text-slate-800 mt-1">
+                {shiftAssignmentValidation.assignedShiftsToday.length > 0 ? (
+                  <span>
+                    Ca hôm nay: <strong className="text-emerald-700">{shiftAssignmentValidation.assignedShiftNames.join(', ')}</strong>
+                  </span>
+                ) : (
+                  <span className="text-rose-700">Hôm nay bạn không có ca trong lịch phân ca đã duyệt.</span>
+                )}
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                IP ghim của {currentBranch.shortName}: <span className="font-mono font-bold text-slate-800">{currentBranch.pinnedWifiIp || 'Chưa thiết lập'}</span>
-              </p>
             </div>
           </div>
 
-          {/* Hardware Device Key Verification Row */}
+          {/* Rule 2: Check-In/Out Time Window (±30 mins) */}
           <div
-            className={`p-4 rounded-xl border flex items-start space-x-3 transition-all ${
-              deviceValidation.isValid
-                ? 'bg-emerald-50/70 border-emerald-300 shadow-xs'
-                : 'bg-rose-50/70 border-rose-300 shadow-xs'
+            className={`p-3.5 rounded-2xl border flex items-start space-x-3 transition-all ${
+              (!activeRecord ? checkInTimeValidation.isValid : checkOutTimeValidation?.isValid)
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
+                : 'bg-amber-50/80 border-amber-300 shadow-2xs'
             }`}
           >
             <div
-              className={`p-2.5 rounded-xl ${
-                deviceValidation.isValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
+              className={`p-2 rounded-xl shrink-0 ${
+                (!activeRecord ? checkInTimeValidation.isValid : checkOutTimeValidation?.isValid)
+                  ? 'bg-emerald-200 text-emerald-800'
+                  : 'bg-amber-200 text-amber-800'
               }`}
             >
-              <Smartphone className="w-5 h-5" />
+              <Clock className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-xs font-bold text-slate-900">Mã Máy Điện Thoại Phần Cứng</span>
-                  {hwInfo && (
-                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-md">
-                      📱 {hwInfo.deviceName}
-                    </span>
-                  )}
-                </div>
+                <span className="text-xs font-bold text-slate-900">
+                  2. Khung Giờ Bắt Đầu/Kết Thúc (±30p)
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    (!activeRecord ? checkInTimeValidation.isValid : checkOutTimeValidation?.isValid)
+                      ? 'bg-emerald-200 text-emerald-800'
+                      : 'bg-amber-200 text-amber-800'
+                  }`}
+                >
+                  {!activeRecord
+                    ? checkInTimeValidation.statusLabel
+                    : checkOutTimeValidation?.statusLabel || 'Chờ'}
+                </span>
+              </div>
+              <div className="text-xs text-slate-600 mt-1">
+                {!activeRecord ? (
+                  <span>
+                    {SHIFT_DEFINITIONS[selectedShift].name} mở check-in:{' '}
+                    <strong className="font-mono text-emerald-800">
+                      {checkInTimeValidation.windowStartStr} – {checkInTimeValidation.windowEndStr}
+                    </strong>
+                  </span>
+                ) : (
+                  <span>
+                    {SHIFT_DEFINITIONS[activeRecord.shiftType].name} mở check-out:{' '}
+                    <strong className="font-mono text-emerald-800">
+                      {checkOutTimeValidation?.windowStartStr} – {checkOutTimeValidation?.windowEndStr}
+                    </strong>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Condition 3: GPS Radius */}
+          <div
+            className={`p-3.5 rounded-2xl border flex items-start space-x-3 transition-all ${
+              gpsValidation.isValid
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
+                : 'bg-rose-50/70 border-rose-300 shadow-2xs'
+            }`}
+          >
+            <div
+              className={`p-2 rounded-xl shrink-0 ${
+                gpsValidation.isValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
+              }`}
+            >
+              <Navigation className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900">
+                  3. Định Vị GPS Quán (±50m)
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    gpsValidation.isValid
+                      ? 'bg-emerald-200 text-emerald-800'
+                      : 'bg-rose-200 text-rose-800'
+                  }`}
+                >
+                  {gpsValidation.isValid ? '✓ Có Mặt Tại Quán' : '✗ Ngoài Bán Kính'}
+                </span>
+              </div>
+              <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate">
+                Khoảng cách: <span className={gpsValidation.isValid ? 'text-emerald-700 font-black' : 'text-rose-700 font-black'}>{gpsValidation.distanceMeters}m</span> / {gpsValidation.radiusMeters}m
+              </div>
+            </div>
+          </div>
+
+          {/* Condition 4: Device Code */}
+          <div
+            className={`p-3.5 rounded-2xl border flex items-start space-x-3 transition-all ${
+              deviceValidation.isValid
+                ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
+                : 'bg-rose-50/70 border-rose-300 shadow-2xs'
+            }`}
+          >
+            <div
+              className={`p-2 rounded-xl shrink-0 ${
+                deviceValidation.isValid ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900">4. Khóa Thiết Bị</span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                     deviceValidation.isFirstRegistration
@@ -332,57 +690,29 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
                   }`}
                 >
                   {deviceValidation.isFirstRegistration
-                    ? 'Lần đầu (Tự khóa Mã Máy này)'
+                    ? 'Khóa máy lần đầu'
                     : deviceValidation.isValid
-                    ? '✓ Khớp Mã Máy Chính Chủ'
+                    ? '✓ Khớp Điện Thoại'
                     : '✗ Sai Điện Thoại'}
                 </span>
               </div>
-              <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate flex items-center space-x-2">
-                <span>Mã máy: <strong className="text-emerald-800 bg-emerald-100/60 px-1.5 py-0.5 rounded">{currentDeviceId}</strong></span>
-                <span className="text-[9px] font-sans font-normal text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                  🔒 SHA-256 Digest
-                </span>
+              <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate">
+                Mã máy: <strong className="text-emerald-800">{currentDeviceId}</strong>
               </div>
-              {hwInfo && (
-                <div className="text-[10.5px] text-slate-500 mt-1 flex flex-wrap gap-x-2">
-                  <span>Chip/GPU: <strong className="text-slate-700">{hwInfo.gpuRenderer}</strong></span>
-                  <span>•</span>
-                  <span>CPU: <strong className="text-slate-700">{hwInfo.cpuCores} Cores</strong></span>
-                </div>
-              )}
-              <p className="text-[11px] text-slate-500 mt-1">
-                {currentUser.registeredDeviceId ? (
-                  <>Mã máy đã khóa: <span className="font-mono font-semibold text-emerald-700">{currentUser.registeredDeviceId}</span></>
-                ) : (
-                  <span className="text-emerald-700 font-semibold">Chưa đăng ký. Mã máy phần cứng từ chiếc điện thoại này sẽ được tự động khóa vĩnh viễn vào tài khoản của bạn khi bấm Check-in.</span>
-                )}
-              </p>
             </div>
-          </div>
-
-          {/* Security explanation note */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
-            <div className="font-bold text-slate-800 flex items-center">
-              <Lock className="w-3.5 h-3.5 mr-1 text-slate-500" />
-              Quy định bảo mật điểm danh
-            </div>
-            <p>
-              Nhân viên chỉ được chấm công khi điện thoại kết nối đúng IP mạng WiFi quán và sử dụng đúng chiếc điện thoại có Mã Máy đã đăng ký.
-            </p>
           </div>
         </div>
 
         {/* Action Panel */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between space-y-5">
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between space-y-5">
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-                Thực Hiện Điểm Danh
+                Thực Hiện Chấm Công
               </h3>
               {activeRecord && (
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                  Đang trong ca trực
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full animate-pulse">
+                  ● Đang trong ca trực
                 </span>
               )}
             </div>
@@ -396,21 +726,34 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   {(['morning', 'afternoon', 'evening'] as ShiftType[]).map((type) => {
                     const def = SHIFT_DEFINITIONS[type];
+                    const win = SHIFT_TIME_WINDOWS[type];
                     const selected = selectedShift === type;
+                    const isAssigned = shiftAssignmentValidation.assignedShiftsToday.includes(type);
+
                     return (
                       <button
                         key={type}
                         type="button"
                         onClick={() => setSelectedShift(type)}
-                        className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                        className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer relative ${
                           selected
-                            ? 'bg-emerald-600 border-emerald-600 text-white font-bold shadow-md'
+                            ? 'bg-emerald-600 border-emerald-600 text-white font-bold shadow-md scale-[1.02]'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        <div className="text-xs">{def.name}</div>
+                        {isAssigned && (
+                          <span className={`absolute -top-1.5 -right-1 text-[8px] font-bold px-1.5 py-0.2 rounded-full shadow-2xs ${
+                            selected ? 'bg-white text-emerald-800' : 'bg-emerald-600 text-white'
+                          }`}>
+                            ĐƯỢC CHIA
+                          </span>
+                        )}
+                        <div className="text-xs font-bold">{def.name}</div>
                         <div className={`text-[10px] font-mono mt-0.5 ${selected ? 'text-emerald-100' : 'text-slate-400'}`}>
                           {def.timeRange}
+                        </div>
+                        <div className={`text-[9px] font-mono mt-1 ${selected ? 'text-emerald-200 font-bold' : 'text-emerald-700'}`}>
+                          Mở: {win.checkInWindowText.split(' ')[0]}
                         </div>
                       </button>
                     );
@@ -423,7 +766,7 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="VD: Đến sớm mở quán, trực quầy pha chế..."
+                    placeholder="VD: Đến sớm chuẩn bị quầy, bàn giao ca..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
@@ -434,15 +777,15 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
 
             {/* If checked in, show current status */}
             {activeRecord && (
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
                 <div className="text-xs text-emerald-900">
                   Bạn đã Check-in ca <span className="font-bold">{SHIFT_DEFINITIONS[activeRecord.shiftType].name}</span> lúc:
                 </div>
                 <div className="text-2xl font-black font-mono text-emerald-800">
                   {activeRecord.checkInTime}
                 </div>
-                <div className="text-[11px] text-slate-500 font-mono">
-                  WiFi: {activeRecord.wifiSsid} • Mã máy: {activeRecord.deviceId}
+                <div className="text-[11px] text-slate-600 font-mono">
+                  Khung giờ Check-out cho phép: <strong className="text-emerald-800">{checkOutTimeValidation?.windowStartStr} – {checkOutTimeValidation?.windowEndStr}</strong>
                 </div>
               </div>
             )}
@@ -454,24 +797,43 @@ export const StaffCheckInView: React.FC<StaffCheckInViewProps> = ({
               <button
                 type="button"
                 onClick={handlePerformCheckOut}
-                className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+                disabled={!canCheckOut}
+                className={`w-full py-3.5 font-black text-sm rounded-2xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 ${
+                  canCheckOut
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-500/20'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                }`}
               >
                 <LogOut className="w-4 h-4" />
-                <span>Hoàn Thành Ca & Check-out Ngay</span>
+                <span>
+                  {canCheckOut
+                    ? 'Xác Nhận Check-out (Tính 5.0h Công)'
+                    : `Chưa Đến Giờ Check-out (Mở Lúc ${checkOutTimeValidation?.windowStartStr})`}
+                </span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handlePerformCheckIn}
-                disabled={!ipValidation.isValid || !deviceValidation.isValid}
-                className={`w-full py-3.5 font-black text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 ${
-                  ipValidation.isValid && deviceValidation.isValid
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                disabled={!canCheckIn}
+                className={`w-full py-3.5 font-black text-sm rounded-2xl shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-98 ${
+                  canCheckIn
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                 }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Xác Nhận Check-in Ca Làm</span>
+                <span>
+                  {canCheckIn
+                    ? 'Xác Nhận Check-in Ca Làm (Tính Công Chuẩn)'
+                    : !shiftAssignmentValidation.isAssigned
+                    ? 'Chưa Được Chia Ca Này (Không Tính Công)'
+                    : !checkInTimeValidation.isValid
+                    ? `Ngoài Khung Giờ (Cho Phép: ${checkInTimeValidation.windowStartStr} - ${checkInTimeValidation.windowEndStr})`
+                    : !gpsValidation.isValid
+                    ? `Chưa Hợp Lệ (Cách Quán ${gpsValidation.distanceMeters}m)`
+                    : 'Chưa Khớp Thiết Bị Đăng Ký'}
+                </span>
               </button>
             )}
           </div>

@@ -6,6 +6,9 @@ export interface Branch {
   shortName: string; // 'Quận 1'
   address: string; // '128 Nguyễn Huệ, P. Bến Nghé, Q. 1, TP. HCM'
   phone: string; // '028 3822 1234'
+  latitude: number; // Tọa độ Vĩ độ GPS của chi nhánh (vd: 10.77428)
+  longitude: number; // Tọa độ Kinh độ GPS của chi nhánh (vd: 106.70395)
+  radiusMeters: number; // Bán kính GPS cho phép chấm công quanh quán (vd: 50m, 30m - 100m)
   pinnedWifiIp: string; // Địa chỉ IP WiFi quán được ghim chính thức để chấm công (vd: 118.69.182.45)
   backupWifiIp?: string; // Địa chỉ IP WiFi phụ
   allowedWifiIps: string[]; // Danh sách các IP WiFi hợp lệ của chi nhánh
@@ -124,14 +127,28 @@ export interface AttendanceRecord {
   shiftType: ShiftType;
   checkInTime: string; // ISO or HH:mm
   checkOutTime?: string | null;
+  // GPS Geolocation fields
+  checkInLat?: number; // Tọa độ vĩ độ thực tế khi bấm chấm công
+  checkInLng?: number; // Tọa độ kinh độ thực tế khi bấm chấm công
+  checkInAccuracy?: number; // Độ chính xác GPS (mét)
+  checkInDistanceMeters?: number; // Khoảng cách thực tế tới quán (mét)
+  isGpsValid: boolean; // Đúng trong bán kính cho phép (30m - 50m)
+  // Device ID & Fingerprint fields
+  deviceId: string;
+  isDeviceIdValid: boolean;
+  deviceInfo?: string; // Tên dòng máy (vd: iPhone 15 Pro, Samsung Galaxy S24)
+  // WiFi backup info
   wifiIp?: string; // Địa chỉ IP WiFi lúc chấm công (vd: 118.69.182.45)
   pinnedWifiIp?: string; // Địa chỉ IP WiFi được ghim của quán
   isIpValid?: boolean; // Khớp địa chỉ IP WiFi quán
-  wifiSsid: string;
+  wifiSsid?: string;
   pinnedWifiSsid?: string;
-  deviceId: string;
-  isDeviceIdValid: boolean;
-  isWifiValid: boolean;
+  isWifiValid?: boolean;
+  // Shift assignment and time window verification (±30 mins rule & assigned shifts only)
+  isShiftAssigned?: boolean; // Đúng ca được chia trong lịch
+  isTimeWindowValid?: boolean; // Khung giờ check-in/out hợp lệ (sớm/trễ tối đa 30p)
+  checkInStatusLabel?: string;
+  checkOutStatusLabel?: string;
   status: 'on-time' | 'late' | 'early-leave' | 'completed' | 'missed';
   workDurationHours?: number;
   notes?: string;

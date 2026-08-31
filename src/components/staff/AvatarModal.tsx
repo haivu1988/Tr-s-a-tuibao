@@ -87,14 +87,20 @@ export const AvatarModal: React.FC<AvatarModalProps> = ({
   currentUser,
   onSaveAvatar,
 }) => {
-  if (!isOpen) return null;
-
-  const [previewUrl, setPreviewUrl] = useState<string>(currentUser.avatar);
+  const [previewUrl, setPreviewUrl] = useState<string>(currentUser?.avatar || '');
   const [customUrlInput, setCustomUrlInput] = useState<string>('');
   const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (currentUser?.avatar) {
+      setPreviewUrl(currentUser.avatar);
+    }
+  }, [currentUser?.avatar]);
+
+  if (!isOpen || !currentUser) return null;
 
   // Handle local file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

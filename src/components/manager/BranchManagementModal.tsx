@@ -4,23 +4,24 @@ import {
   Building2, 
   MapPin, 
   Phone, 
-  Wifi, 
   Users, 
   Plus, 
   Edit3, 
   Trash2, 
   Check, 
   X, 
-  Pin, 
-  Globe,
-  Radio,
-  ChevronRight,
-  DollarSign,
-  Edit2,
-  UserPlus,
-  AlertTriangle
+  ChevronRight, 
+  DollarSign, 
+  Edit2, 
+  UserPlus, 
+  AlertTriangle,
+  Compass,
+  Navigation,
+  LocateFixed,
+  ExternalLink,
+  Radio
 } from 'lucide-react';
-import { fetchCurrentPublicIp, isValidIpAddress } from '../../utils/deviceWifi';
+import { getCurrentDeviceGpsPosition } from '../../utils/geolocation';
 import { EditSalaryModal } from './EditSalaryModal';
 import { AddStaffModal } from './AddStaffModal';
 
@@ -55,31 +56,33 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
   onAddStaff,
   onDeleteStaff,
 }) => {
-  if (!isOpen) return null;
-
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   const [newWifiInput, setNewWifiInput] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'list' | 'edit' | 'staff'>('list');
   const [selectedBranchForStaff, setSelectedBranchForStaff] = useState<string>(activeBranchId);
   const [message, setMessage] = useState<string>('');
-  const [isDetectingIp, setIsDetectingIp] = useState<boolean>(false);
+  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
   const [editingStaffSalary, setEditingStaffSalary] = useState<User | null>(null);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState<boolean>(false);
   const [deletingStaff, setDeletingStaff] = useState<User | null>(null);
 
-  // New branch template
+  if (!isOpen) return null;
+
+  // New branch template with GPS coordinates
   const handleStartCreate = () => {
     const nextNum = branches.length + 1;
-    const defaultIp = `118.69.${180 + nextNum}.${10 + nextNum}`;
     setEditingBranch({
       id: `cn_${Date.now()}`,
       name: `Chi Nhánh ${nextNum} - Mới`,
       shortName: `CN ${nextNum}`,
       address: 'Số ..., Đường ..., TP. Hồ Chí Minh',
       phone: '028 3000 ' + Math.floor(1000 + Math.random() * 9000),
-      pinnedWifiIp: defaultIp,
-      allowedWifiIps: [defaultIp],
+      latitude: 10.77428,
+      longitude: 106.70395,
+      radiusMeters: 50,
+      pinnedWifiIp: '118.69.182.45',
+      allowedWifiIps: ['118.69.182.45'],
       pinnedWifiSsid: `Store_Branch${nextNum}_5G`,
       availableWifis: [`Store_Branch${nextNum}_5G`, `Store_Staff_WiFi`],
       managerName: 'Trần Hoàng Nam',
@@ -92,27 +95,32 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
   const handleStartEdit = (branch: Branch) => {
     setEditingBranch({ 
       ...branch,
-      pinnedWifiIp: branch.pinnedWifiIp || '118.69.182.45',
-      allowedWifiIps: branch.allowedWifiIps || [branch.pinnedWifiIp || '118.69.182.45'],
+      latitude: branch.latitude || 10.77428,
+      longitude: branch.longitude || 106.70395,
+      radiusMeters: branch.radiusMeters || 50,
     });
     setIsCreatingNew(false);
     setActiveTab('edit');
   };
 
-  const handleAutoDetectIpForEdit = async () => {
-    setIsDetectingIp(true);
+  const handleAutoDetectGpsForEdit = async () => {
+    setIsDetectingGps(true);
     try {
-      const detected = await fetchCurrentPublicIp();
-      if (detected && editingBranch) {
-        const allowed = editingBranch.allowedWifiIps || [];
+      const coords = await getCurrentDeviceGpsPosition();
+      if (coords && editingBranch) {
+        const newLat = Math.round(coords.latitude * 1000000) / 1000000;
+        const newLng = Math.round(coords.longitude * 1000000) / 1000000;
         setEditingBranch({
           ...editingBranch,
-          pinnedWifiIp: detected,
-          allowedWifiIps: allowed.includes(detected) ? allowed : [...allowed, detected],
+          latitude: newLat,
+          longitude: newLng,
         });
+        alert(`Đã lấy tọa độ GPS thực tế: ${newLat}, ${newLng} (Độ chính xác: ±${coords.accuracy}m)!`);
       }
+    } catch (err: any) {
+      alert(err?.message || 'Không thể lấy GPS. Vui lòng cho phép quyền định vị trên trình duyệt hoặc nhập tọa độ thủ công.');
     } finally {
-      setIsDetectingIp(false);
+      setIsDetectingGps(false);
     }
   };
 
@@ -120,24 +128,25 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
     e.preventDefault();
     if (!editingBranch) return;
 
-    if (!editingBranch.name.trim() || !editingBranch.pinnedWifiSsid.trim() || !editingBranch.pinnedWifiIp?.trim()) {
-      alert('Vui lòng điền đầy đủ Tên chi nhánh, Địa chỉ IP WiFi ghim và Tên WiFi!');
+    if (!editingBranch.name.trim()) {
+      alert('Vui lòng điền tên chi nhánh!');
       return;
     }
 
-    if (!isValidIpAddress(editingBranch.pinnedWifiIp)) {
-      alert('Địa chỉ IP không đúng định dạng IPv4 (vd: 118.69.182.45) hoặc IPv6!');
+    const lat = Number(editingBranch.latitude);
+    const lng = Number(editingBranch.longitude);
+    const rad = Number(editingBranch.radiusMeters) || 50;
+
+    if (isNaN(lat) || isNaN(lng)) {
+      alert('Tọa độ GPS Vĩ độ và Kinh độ phải là số hợp lệ!');
       return;
     }
-
-    const currentAllowed = editingBranch.allowedWifiIps || [];
-    const finalAllowed = currentAllowed.includes(editingBranch.pinnedWifiIp)
-      ? currentAllowed
-      : [...currentAllowed, editingBranch.pinnedWifiIp];
 
     const finalBranch: Branch = {
       ...editingBranch,
-      allowedWifiIps: finalAllowed,
+      latitude: lat,
+      longitude: lng,
+      radiusMeters: rad,
     };
 
     onSaveBranch(finalBranch);
@@ -321,21 +330,21 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
 
                         <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
                           <div className="text-[10px] text-slate-400 font-semibold flex items-center space-x-1">
-                            <Globe className="w-3 h-3 text-emerald-600" />
-                            <span>IP Ghim:</span>
+                            <Compass className="w-3 h-3 text-emerald-600" />
+                            <span>GPS Ghim:</span>
                           </div>
-                          <div className="font-mono font-bold text-emerald-700 mt-0.5 truncate text-[11px]" title={branch.pinnedWifiIp}>
-                            {branch.pinnedWifiIp || 'Chưa ghim'}
+                          <div className="font-mono font-bold text-emerald-700 mt-0.5 truncate text-[11px]" title={`${branch.latitude}, ${branch.longitude}`}>
+                            {branch.latitude ? `${branch.latitude.toFixed(4)}, ${branch.longitude?.toFixed(4)}` : 'Chưa ghim'}
                           </div>
                         </div>
 
                         <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
                           <div className="text-[10px] text-slate-400 font-semibold flex items-center space-x-1">
-                            <Wifi className="w-3 h-3 text-slate-500" />
-                            <span>WiFi:</span>
+                            <Navigation className="w-3 h-3 text-slate-500" />
+                            <span>Bán kính:</span>
                           </div>
-                          <div className="font-mono font-semibold text-slate-700 mt-0.5 truncate text-[11px]" title={branch.pinnedWifiSsid}>
-                            {branch.pinnedWifiSsid}
+                          <div className="font-mono font-semibold text-slate-700 mt-0.5 truncate text-[11px]">
+                            ±{branch.radiusMeters || 50} mét
                           </div>
                         </div>
                       </div>
@@ -591,137 +600,134 @@ export const BranchManagementModal: React.FC<BranchManagementModalProps> = ({
                 </div>
               </div>
 
-              {/* IP PINNING CONFIGURATION SECTION */}
-              <div className="p-4 bg-emerald-50/40 rounded-2xl border-2 border-emerald-500/30 space-y-3">
+              {/* GPS PINNING CONFIGURATION SECTION */}
+              <div className="p-4 bg-emerald-50/40 rounded-2xl border-2 border-emerald-500/30 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center space-x-2">
-                    <Globe className="w-4 h-4 text-emerald-600" />
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Ghim Địa Chỉ IP WiFi Quán Để Chấm Công (Bắt Buộc)
-                    </h4>
+                    <Compass className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Ghim Tọa Độ GPS & Bán Kính Chấm Công Quán (Bắt Buộc)
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        Nhân viên bắt buộc phải có mặt tại phạm vi GPS này để chấm công
+                      </p>
+                    </div>
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleAutoDetectIpForEdit}
-                    disabled={isDetectingIp}
-                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center space-x-1 cursor-pointer"
+                    onClick={handleAutoDetectGpsForEdit}
+                    disabled={isDetectingGps}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer shadow-xs shrink-0"
                   >
-                    <Radio className={`w-3 h-3 ${isDetectingIp ? 'animate-spin' : ''}`} />
-                    <span>{isDetectingIp ? 'Đang lấy...' : 'Lấy IP Mạng Hiện Tại'}</span>
+                    <LocateFixed className={`w-3.5 h-3.5 ${isDetectingGps ? 'animate-spin' : ''}`} />
+                    <span>{isDetectingGps ? 'Đang quét GPS...' : '📍 Lấy GPS Tại Quán'}</span>
                   </button>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Địa chỉ IP WiFi Ghim Cho Chi Nhánh Này (IPv4/IPv6) *
-                  </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3.5 rounded-xl border border-slate-200">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Vĩ Độ GPS (Latitude) *
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={editingBranch.latitude || ''}
+                      onChange={(e) =>
+                        setEditingBranch({ ...editingBranch, latitude: parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="vd: 10.774280"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Tọa độ Vĩ độ (TP.HCM: ~10.7x)</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Kinh Độ GPS (Longitude) *
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={editingBranch.longitude || ''}
+                      onChange={(e) =>
+                        setEditingBranch({ ...editingBranch, longitude: parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="vd: 106.703950"
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl font-mono font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Tọa độ Kinh độ (TP.HCM: ~106.7x)</span>
+                  </div>
+                </div>
+
+                {/* Radius configuration */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700">Bán kính GPS cho phép chấm công quanh quán:</span>
+                    <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      ±{editingBranch.radiusMeters || 50} mét
+                    </span>
+                  </div>
+
+                  {/* Quick Select Buttons */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { value: 30, label: '30m (Chuẩn)' },
+                      { value: 50, label: '50m (Mặc định)' },
+                      { value: 100, label: '100m (Rộng)' },
+                      { value: 200, label: '200m (Tòa nhà)' },
+                    ].map((r) => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => setEditingBranch({ ...editingBranch, radiusMeters: r.value })}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          editingBranch.radiusMeters === r.value
+                            ? 'bg-slate-900 text-white shadow-2xs'
+                            : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <input
-                    type="text"
-                    required
-                    value={editingBranch.pinnedWifiIp || ''}
+                    type="range"
+                    min={10}
+                    max={300}
+                    step={10}
+                    value={editingBranch.radiusMeters || 50}
                     onChange={(e) =>
-                      setEditingBranch({ ...editingBranch, pinnedWifiIp: e.target.value })
+                      setEditingBranch({ ...editingBranch, radiusMeters: Number(e.target.value) })
                     }
-                    placeholder="vd: 118.69.182.45"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 bg-white"
+                    className="w-full accent-emerald-600 cursor-pointer mt-1"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    *Chỉ nhân viên kết nối mạng có địa chỉ IP này mới được duyệt chấm công hợp lệ tại chi nhánh.
-                  </p>
-                </div>
-              </div>
-
-              {/* WIFI PINNING SECTION FOR THIS BRANCH */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Pin className="w-4 h-4 text-emerald-600" />
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Ghim WiFi Chấm Công Cho Chi Nhánh Này
-                  </h4>
                 </div>
 
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Nhân viên thuộc chi nhánh này bắt buộc phải kết nối đúng WiFi đã ghim để chấm công hợp lệ:
-                </p>
+                {/* Google Maps verify link */}
+                {editingBranch.latitude && editingBranch.longitude ? (
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-slate-500 flex items-center space-x-1">
+                      <Navigation className="w-3 h-3 text-emerald-600" />
+                      <span>Tọa độ đã ghim: {editingBranch.latitude}, {editingBranch.longitude}</span>
+                    </span>
 
-                {/* Available WiFis List with Pin action */}
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-slate-700 block">
-                    Danh Sách WiFi Khả Dụng & WiFi Đã Ghim:
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {editingBranch.availableWifis.map((wifiSsid) => {
-                      const isPinned = editingBranch.pinnedWifiSsid === wifiSsid;
-                      return (
-                        <div
-                          key={wifiSsid}
-                          className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${
-                            isPinned
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold shadow-2xs'
-                              : 'bg-white border-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2 min-w-0 pr-2">
-                            <Wifi className={`w-3.5 h-3.5 shrink-0 ${isPinned ? 'text-emerald-600' : 'text-slate-400'}`} />
-                            <span className="font-mono text-xs truncate">{wifiSsid}</span>
-                          </div>
-
-                          <div className="flex items-center space-x-1.5 shrink-0">
-                            {isPinned ? (
-                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white flex items-center space-x-1">
-                                <Pin className="w-2.5 h-2.5" />
-                                <span>ĐÃ GHIM</span>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setEditingBranch({
-                                    ...editingBranch,
-                                    pinnedWifiSsid: wifiSsid,
-                                  })
-                                }
-                                className="px-2 py-0.5 rounded text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer"
-                              >
-                                Ghim WiFi Này
-                              </button>
-                            )}
-
-                            {editingBranch.availableWifis.length > 1 && !isPinned && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveWifiFromBranch(wifiSsid)}
-                                className="text-slate-400 hover:text-red-500 p-1 text-xs"
-                                title="Xóa WiFi khỏi danh sách"
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <a
+                      href={`https://www.google.com/maps?q=${editingBranch.latitude},${editingBranch.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-1 text-xs font-bold text-emerald-700 hover:underline"
+                    >
+                      <span>Xem thử trên Google Maps</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                </div>
-
-                {/* Add new WiFi to Branch */}
-                <div className="flex items-center space-x-2 pt-2">
-                  <input
-                    type="text"
-                    value={newWifiInput}
-                    onChange={(e) => setNewWifiInput(e.target.value)}
-                    placeholder="Thêm tên WiFi mới (SSID)..."
-                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddWifiToBranch}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
-                  >
-                    + Thêm WiFi
-                  </button>
-                </div>
+                ) : null}
               </div>
 
               {/* Form Actions */}

@@ -17,8 +17,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   staffList,
   taskToEdit,
 }) => {
-  if (!isOpen) return null;
-
   const [title, setTitle] = useState<string>(taskToEdit?.title || '');
   const [description, setDescription] = useState<string>(taskToEdit?.description || '');
   const [assignedToUserId, setAssignedToUserId] = useState<string>(taskToEdit?.assignedToUserId || '');
@@ -33,6 +31,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     ]
   );
   const [newChecklistText, setNewChecklistText] = useState<string>('');
+
+  if (!isOpen) return null;
 
   const handleAddChecklist = () => {
     if (newChecklistText.trim()) {

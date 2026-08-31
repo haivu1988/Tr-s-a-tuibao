@@ -17,12 +17,17 @@ import {
   Building2,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react';
 import { 
   getSolarDateInfo, 
   getSolarWeekRangeText, 
-  getAvailableSolarWeeks 
+  getAvailableSolarWeeks,
+  getCurrentSolarWeekId,
+  getNextWeekId,
+  getPrevWeekId,
+  isCurrentWeek
 } from '../../utils/solarCalendar';
 
 interface StaffScheduleViewProps {
@@ -47,7 +52,7 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
     currentUser.branchId || branches?.[0]?.id || 'cn_quan1'
   );
 
-  const availableWeeks = getAvailableSolarWeeks();
+  const availableWeeks = getAvailableSolarWeeks(weekId, 6, 10);
   const currentBranch = branches?.find((b) => b.id === selectedBranchId) || branches?.[0] || {
     id: 'cn_quan1',
     name: 'Chi Nhánh 1 - Quận 1',
@@ -58,6 +63,8 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
     status: 'active',
   };
   const solarRange = getSolarWeekRangeText(weekId);
+  const isThisWeek = isCurrentWeek(weekId);
+  const currentSolarWeekId = getCurrentSolarWeekId();
 
   const dayIndex = new Date().getDay();
   const dayKeyMap: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -73,16 +80,20 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
     (a) => a.assignedUserIds.includes(currentUser.id)
   );
 
-  // Quick next/prev week navigators
-  const currentWeekIdx = availableWeeks.findIndex((w) => w.weekId === weekId);
+  // Quick next/prev week navigators using dynamic ISO week math
   const handlePrevWeek = () => {
-    if (onSelectWeek && currentWeekIdx > 0) {
-      onSelectWeek(availableWeeks[currentWeekIdx - 1].weekId);
+    if (onSelectWeek) {
+      onSelectWeek(getPrevWeekId(weekId));
     }
   };
   const handleNextWeek = () => {
-    if (onSelectWeek && currentWeekIdx < availableWeeks.length - 1) {
-      onSelectWeek(availableWeeks[currentWeekIdx + 1].weekId);
+    if (onSelectWeek) {
+      onSelectWeek(getNextWeekId(weekId));
+    }
+  };
+  const handleResetToCurrentWeek = () => {
+    if (onSelectWeek) {
+      onSelectWeek(currentSolarWeekId);
     }
   };
 
@@ -91,8 +102,8 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
     
     myAssignments.forEach((assign) => {
       const shiftDef = SHIFT_DEFINITIONS[assign.shiftType];
-      const dayLabel = DAYS_OF_WEEK.find((d) => d.key === assign.day)?.label;
-      icsContent += `BEGIN:VEVENT\nSUMMARY:Ca làm việc ${shiftDef.name} (${shiftDef.timeRange})\nDESCRIPTION:Ca trực tại ${currentBranch.name}\nSTATUS:CONFIRMED\nEND:VEVENT\n`;
+      const solarInfo = getSolarDateInfo(weekId, assign.day);
+      icsContent += `BEGIN:VEVENT\nSUMMARY:Ca làm việc ${shiftDef.name} (${shiftDef.timeRange})\nDESCRIPTION:Ca trực tại ${currentBranch.name} ngày ${solarInfo.displayFullWithDay}\nSTATUS:CONFIRMED\nEND:VEVENT\n`;
     });
     
     icsContent += "END:VCALENDAR";
@@ -123,24 +134,27 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
               <CalendarDays className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-black text-slate-800 flex items-center gap-2">
-                <span>Lịch Làm Việc (Dương Lịch)</span>
-                {weekId === '2026-W35' ? (
-                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                    Tuần này
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-black text-slate-800">
+                  Lịch Làm Việc (Dương Lịch)
+                </h2>
+                {isThisWeek ? (
+                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Tuần này (Hiện tại)
                   </span>
-                ) : weekId > '2026-W35' ? (
-                  <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                    Tuần tới
+                ) : weekId > currentSolarWeekId ? (
+                  <span className="text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                    Lịch tuần tới
                   </span>
                 ) : (
-                  <span className="text-[11px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                    Lịch cũ
+                  <span className="text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                    Lịch tuần cũ
                   </span>
                 )}
-              </h2>
-              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
-                <span className="font-bold text-slate-800 flex items-center text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
+              </div>
+              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                <span className="font-bold flex items-center text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                   <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600 inline" />
                   {solarRange}
                 </span>
@@ -155,7 +169,7 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
           {/* Branch & Week Selection Pills */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {/* Branch Selector */}
-            <div className="flex items-center space-x-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-xs">
+            <div className="flex items-center space-x-1 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
               <Building2 className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-slate-500 font-medium">Chi nhánh:</span>
               <select
@@ -170,6 +184,18 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
                 ))}
               </select>
             </div>
+
+            {/* Jump to Current Week button if navigating away */}
+            {!isThisWeek && onSelectWeek && (
+              <button
+                type="button"
+                onClick={handleResetToCurrentWeek}
+                className="flex items-center space-x-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl px-2.5 py-1 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                <RotateCcw className="w-3 h-3 text-emerald-600" />
+                <span>Về tuần này</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -181,9 +207,8 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
               <button
                 type="button"
                 onClick={handlePrevWeek}
-                disabled={currentWeekIdx <= 0}
-                title="Tuần trước"
-                className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                title="Lùi lại tuần cũ (Back)"
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -203,9 +228,8 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({
               <button
                 type="button"
                 onClick={handleNextWeek}
-                disabled={currentWeekIdx >= availableWeeks.length - 1}
-                title="Tuần tiếp theo"
-                className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                title="Sang tuần tiếp theo (Next)"
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

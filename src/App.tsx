@@ -22,6 +22,7 @@ import {
   loadFromStorage, 
   saveToStorage 
 } from './data/mockData';
+import { getCurrentSolarWeekId } from './utils/solarCalendar';
 import { 
   getClientDeviceId, 
   getSimulatedWifi, 
@@ -153,7 +154,7 @@ export default function App() {
     loadFromStorage(STORAGE_KEY_WIFI, INITIAL_WIFI_CONFIG)
   );
 
-  const [weekId, setWeekId] = useState<string>(CURRENT_WEEK_ID);
+  const [weekId, setWeekId] = useState<string>(() => getCurrentSolarWeekId());
 
   const [registrations, setRegistrations] = useState<ShiftRegistration[]>(() =>
     loadFromStorage(STORAGE_KEY_REGS, INITIAL_REGISTRATIONS)
@@ -943,6 +944,8 @@ export default function App() {
                   currentSimulatedIp={currentSimulatedIp}
                   currentDeviceId={currentDeviceId}
                   attendanceLogs={attendanceLogs}
+                  assignments={assignments}
+                  weekId={weekId}
                   onCheckInSuccess={handleCheckInSuccess}
                   onCheckOutSuccess={handleCheckOutSuccess}
                 />
@@ -1066,6 +1069,8 @@ export default function App() {
         currentSimulatedIp={currentSimulatedIp}
         currentDeviceId={currentDeviceId}
         attendanceLogs={attendanceLogs}
+        assignments={assignments}
+        weekId={weekId}
         onCheckInSuccess={handleCheckInSuccess}
         onCheckOutSuccess={handleCheckOutSuccess}
       />

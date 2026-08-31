@@ -15,7 +15,10 @@ import {
   Building2,
   ChevronRight,
   Users,
-  Camera
+  Camera,
+  Compass,
+  MapPin,
+  Navigation
 } from 'lucide-react';
 import { User, Branch, WifiStoreConfig } from '../../types';
 
@@ -154,14 +157,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {currentBranch?.name}
             </div>
 
-            {/* Pinned WiFi indicator */}
+            {/* Pinned GPS indicator */}
             <div className="mt-1.5 pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[11px]">
               <span className="text-slate-400 flex items-center space-x-1">
-                <Pin className="w-2.5 h-2.5 text-amber-400" />
-                <span>WiFi Đã Ghim:</span>
+                <Compass className="w-3 h-3 text-emerald-400" />
+                <span>GPS Đã Ghim:</span>
               </span>
-              <span className="font-mono font-bold text-emerald-400 text-[10px] truncate max-w-[100px]" title={currentBranch?.pinnedWifiSsid}>
-                {currentBranch?.pinnedWifiSsid}
+              <span className="font-mono font-bold text-emerald-400 text-[10px] truncate max-w-[110px]" title={`${currentBranch?.latitude}, ${currentBranch?.longitude}`}>
+                {currentBranch?.latitude ? `${currentBranch.latitude.toFixed(3)}, ${currentBranch.longitude?.toFixed(3)}` : 'Chưa ghim'}
               </span>
             </div>
 
@@ -210,12 +213,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom Section: WiFi Quick Status & Auth */}
         <div className="p-3 border-t border-slate-800 space-y-2">
-          {/* Quick WiFi Pin status */}
+          {/* Quick GPS Pin status */}
           <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/60 text-xs">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-slate-400 font-semibold flex items-center space-x-1">
-                <Wifi className="w-3 h-3 text-emerald-400" />
-                <span>Trạng Thái Mạng</span>
+                <MapPin className="w-3 h-3 text-emerald-400" />
+                <span>📍 GPS Định Vị Quán</span>
               </span>
               {isManager && (
                 <button
@@ -226,22 +229,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline cursor-pointer flex items-center space-x-0.5"
                 >
                   <Pin className="w-2.5 h-2.5" />
-                  <span>Ghim WiFi</span>
+                  <span>Ghim GPS</span>
                 </button>
               )}
             </div>
 
             <div className="font-mono text-[11px] truncate flex items-center justify-between">
-              <span className="text-slate-300 truncate">{currentSimulatedWifi}</span>
-              {isConnectedPinnedWifi ? (
-                <span className="text-[9px] bg-emerald-950 text-emerald-400 px-1.5 py-0.2 rounded font-bold border border-emerald-800">
-                  HỢP LỆ
-                </span>
-              ) : (
-                <span className="text-[9px] bg-red-950 text-red-400 px-1.5 py-0.2 rounded font-bold border border-red-800">
-                  CHƯA GHIM
-                </span>
-              )}
+              <span className="text-slate-300 truncate" title={`${currentBranch?.latitude}, ${currentBranch?.longitude}`}>
+                {currentBranch?.latitude ? `${currentBranch.latitude.toFixed(3)}, ${currentBranch.longitude.toFixed(3)}` : 'Chưa ghim'}
+              </span>
+              <span className="text-[9px] bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded font-bold border border-emerald-800 shrink-0 ml-1">
+                ±{currentBranch?.radiusMeters || 50}m
+              </span>
             </div>
           </div>
 

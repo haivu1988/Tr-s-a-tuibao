@@ -22,12 +22,18 @@ import {
   Layers,
   LayoutList,
   CalendarDays,
-  Save
+  Save,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { 
   getSolarDateInfo, 
   getSolarWeekRangeText, 
-  getAvailableSolarWeeks 
+  getAvailableSolarWeeks,
+  getCurrentSolarWeekId,
+  getNextWeekId,
+  getPrevWeekId,
+  isCurrentWeek
 } from '../../utils/solarCalendar';
 import confetti from 'canvas-confetti';
 
@@ -58,7 +64,25 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
     status: 'active',
   };
   const solarRange = getSolarWeekRangeText(weekId);
-  const availableWeeks = getAvailableSolarWeeks();
+  const availableWeeks = getAvailableSolarWeeks(weekId, 6, 10);
+  const isThisWeek = isCurrentWeek(weekId);
+  const currentSolarWeekId = getCurrentSolarWeekId();
+
+  const handlePrevWeek = () => {
+    if (onSelectWeek) {
+      onSelectWeek(getPrevWeekId(weekId));
+    }
+  };
+  const handleNextWeek = () => {
+    if (onSelectWeek) {
+      onSelectWeek(getNextWeekId(weekId));
+    }
+  };
+  const handleResetToCurrentWeek = () => {
+    if (onSelectWeek) {
+      onSelectWeek(currentSolarWeekId);
+    }
+  };
 
   // Current user's registered keys for this week: `${day}_${shiftType}`
   const userRegs = registrations.filter(
@@ -262,12 +286,33 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
 
         {/* Week Selector & Top Action Buttons */}
         <div className="flex items-center justify-between md:justify-end gap-2.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 flex-wrap">
+          {/* Quick jump to current week button */}
+          {!isThisWeek && onSelectWeek && (
+            <button
+              type="button"
+              onClick={handleResetToCurrentWeek}
+              className="flex items-center space-x-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl px-2.5 py-1 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+            >
+              <RotateCcw className="w-3 h-3 text-emerald-600" />
+              <span>Về tuần này</span>
+            </button>
+          )}
+
           {onSelectWeek && (
-            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 shrink-0">
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 shrink-0 shadow-2xs">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                title="Lùi lại tuần cũ (Back)"
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
               <select
                 value={weekId}
                 onChange={(e) => onSelectWeek(e.target.value)}
-                className="text-xs font-bold text-slate-800 bg-transparent px-2 py-1 focus:outline-none cursor-pointer"
+                className="text-xs font-bold text-slate-800 bg-transparent px-2 py-1 focus:outline-none cursor-pointer max-w-[200px] sm:max-w-none"
               >
                 {availableWeeks.map((w) => (
                   <option key={w.weekId} value={w.weekId}>
@@ -275,6 +320,15 @@ export const StaffRegisterView: React.FC<StaffRegisterViewProps> = ({
                   </option>
                 ))}
               </select>
+
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                title="Sang tuần tiếp theo (Next)"
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           )}
 

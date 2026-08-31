@@ -24,11 +24,19 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   registrations = [],
   onSaveAssignment,
 }) => {
-  if (!isOpen || !assignment) return null;
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(assignment?.assignedUserIds || []);
+  const [status, setStatus] = useState<'pending' | 'approved'>(assignment?.status || 'approved');
+  const [notes, setNotes] = useState<string>(assignment?.notes || '');
 
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(assignment.assignedUserIds || []);
-  const [status, setStatus] = useState<'pending' | 'approved'>(assignment.status);
-  const [notes, setNotes] = useState<string>(assignment.notes || '');
+  React.useEffect(() => {
+    if (assignment) {
+      setSelectedUserIds(assignment.assignedUserIds || []);
+      setStatus(assignment.status);
+      setNotes(assignment.notes || '');
+    }
+  }, [assignment]);
+
+  if (!isOpen || !assignment) return null;
 
   const dayInfo = DAYS_OF_WEEK.find((d) => d.key === assignment.day);
   const shiftDef = SHIFT_DEFINITIONS[assignment.shiftType];

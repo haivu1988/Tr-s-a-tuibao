@@ -54,11 +54,12 @@ export const ManagerStaffView: React.FC<ManagerStaffViewProps> = ({
 
   const filteredStaff = staffMembers.filter((staff) => {
     const matchBranch = selectedBranchFilter === 'all' || staff.branchId === selectedBranchFilter;
+    const term = searchQuery.toLowerCase();
     const matchSearch = 
-      staff.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      staff.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      staff.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (staff.department && staff.department.toLowerCase().includes(searchQuery.toLowerCase()));
+      (staff.name && staff.name.toLowerCase().includes(term)) ||
+      (staff.id && staff.id.toLowerCase().includes(term)) ||
+      (staff.phone && staff.phone.toLowerCase().includes(term)) ||
+      (staff.department && staff.department.toLowerCase().includes(term));
     return matchBranch && matchSearch;
   });
 

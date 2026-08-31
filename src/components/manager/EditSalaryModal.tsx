@@ -26,10 +26,8 @@ export const EditSalaryModal: React.FC<EditSalaryModalProps> = ({
   branchName,
   onSaveRate,
 }) => {
-  if (!isOpen || !staff) return null;
-
-  const [hourlyRate, setHourlyRate] = useState<number>(staff.hourlyRate || 22000);
-  const [inputValue, setInputValue] = useState<string>(String(staff.hourlyRate || 22000));
+  const [hourlyRate, setHourlyRate] = useState<number>(staff?.hourlyRate || 22000);
+  const [inputValue, setInputValue] = useState<string>(String(staff?.hourlyRate || 22000));
   const [successMsg, setSuccessMsg] = useState<string>('');
 
   useEffect(() => {
@@ -40,6 +38,8 @@ export const EditSalaryModal: React.FC<EditSalaryModalProps> = ({
       setSuccessMsg('');
     }
   }, [staff]);
+
+  if (!isOpen || !staff) return null;
 
   const handleInputChange = (val: string) => {
     // Only numbers

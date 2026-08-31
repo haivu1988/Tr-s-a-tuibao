@@ -58,8 +58,6 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   existingUsers,
   onAddStaff,
 }) => {
-  if (!isOpen) return null;
-
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
@@ -71,6 +69,8 @@ export const AddStaffModal: React.FC<AddStaffModalProps> = ({
   const [selectedAvatar, setSelectedAvatar] = useState(PRESET_AVATARS[0]);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  if (!isOpen) return null;
 
   // Auto-generate username suggestion from name
   const handleNameChange = (val: string) => {

@@ -219,35 +219,32 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* 4. Pinned WiFi Status Card */}
+        {/* 4. Pinned GPS Status Card */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">WiFi Đã Ghim</span>
+            <span className="text-xs font-semibold text-slate-500">📍 GPS Quán Đã Ghim</span>
             <button
               onClick={onOpenWifiModal}
-              title="Đổi hoặc ghim WiFi mới"
+              title="Đổi hoặc ghim GPS quán mới"
               className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
             >
               <Pin className="w-4 h-4 text-emerald-600" />
             </button>
           </div>
           <div className="mt-2">
-            <div className="text-xs font-mono font-bold text-slate-900 truncate" title={currentBranch.pinnedWifiSsid}>
-              📌 {currentBranch.pinnedWifiSsid}
+            <div className="text-xs font-mono font-bold text-slate-900 truncate" title={`${currentBranch.latitude}, ${currentBranch.longitude}`}>
+              📍 {currentBranch.latitude ? `${currentBranch.latitude.toFixed(4)}, ${currentBranch.longitude.toFixed(4)}` : 'Chưa ghim GPS'}
             </div>
-            <div className="mt-1.5">
-              {isPinnedWifiActive ? (
-                <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                  ✓ Khớp mạng chấm công
-                </span>
-              ) : (
-                <button
-                  onClick={onOpenWifiModal}
-                  className="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 hover:underline cursor-pointer"
-                >
-                  <AlertCircle className="w-3 h-3 mr-1" /> Ghim WiFi khác
-                </button>
-              )}
+            <div className="mt-1.5 flex items-center justify-between">
+              <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                Bán kính: ±{currentBranch.radiusMeters || 50}m
+              </span>
+              <button
+                onClick={onOpenWifiModal}
+                className="text-[10px] font-bold text-slate-500 hover:text-emerald-700 underline cursor-pointer"
+              >
+                Ghim GPS
+              </button>
             </div>
           </div>
         </div>

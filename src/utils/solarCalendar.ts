@@ -2,28 +2,87 @@ import { DayOfWeek, DAYS_OF_WEEK } from '../types';
 
 /**
  * Solar Calendar (Dương Lịch) Utilities for Vietnam
- * Calculates exact Gregorian dates for weeks, shifts, attendance, and payroll.
+ * Calculates exact Gregorian dates for real-time automatic dates, dynamic ISO weeks, 
+ * shift scheduling, attendance verification, and smooth Next/Back week navigation.
  */
 
-// Helper to parse weekId (e.g., "2026-W35") to the Monday start Date
+// Calculate the ISO week ID for any given Date object (e.g., "2026-W36")
+export function getIsoWeekId(d: Date = new Date()): string {
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayNr = (target.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+  target.setDate(target.getDate() - dayNr + 3); // Nearest Thursday
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+  }
+  const weekNum = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  const year = new Date(firstThursday).getFullYear();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${year}-W${pad(weekNum)}`;
+}
+
+// Automatically detect the CURRENT real-world solar week ID
+export function getCurrentSolarWeekId(): string {
+  return getIsoWeekId(new Date());
+}
+
+// Parse a week ID (e.g., "2026-W36") and return the Monday Date (00:00:00 local time)
 export function getStartDateOfWeek(weekId: string): Date {
   const match = weekId.match(/^(\d{4})-W(\d{1,2})$/);
   if (!match) {
-    // Default fallback to 2026-08-24 (Monday of W35 2026)
-    return new Date(2026, 7, 24);
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - day, 0, 0, 0, 0);
   }
 
   const year = parseInt(match[1], 10);
   const weekNumber = parseInt(match[2], 10);
 
-  // ISO week calculation: Week 1 is the week with Jan 4th
+  // Jan 4th is always in ISO week 1
   const jan4 = new Date(year, 0, 4);
-  const dayOfWeek = jan4.getDay() || 7; // 1 (Mon) - 7 (Sun)
-  const firstMonday = new Date(year, 0, 4 - dayOfWeek + 1);
+  const dayOfJan4 = (jan4.getDay() + 6) % 7; // 0 = Mon, ..., 6 = Sun
+  const monW1 = new Date(year, 0, 4 - dayOfJan4);
 
-  const targetMonday = new Date(firstMonday);
-  targetMonday.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+  const targetMonday = new Date(monW1.getFullYear(), monW1.getMonth(), monW1.getDate() + (weekNumber - 1) * 7, 0, 0, 0, 0);
   return targetMonday;
+}
+
+// Get the Sunday Date of a week
+export function getEndDateOfWeek(weekId: string): Date {
+  const monday = getStartDateOfWeek(weekId);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+  return sunday;
+}
+
+// Calculate the week ID after adding/subtracting N weeks (offset: +1 for next, -1 for back)
+export function getAdjacentWeekId(weekId: string, offset: number = 1): string {
+  const monday = getStartDateOfWeek(weekId);
+  const targetDate = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset * 7 + 3); // Thursday of target week
+  return getIsoWeekId(targetDate);
+}
+
+// Quick helper to get Next Week ID
+export function getNextWeekId(weekId: string): string {
+  return getAdjacentWeekId(weekId, 1);
+}
+
+// Quick helper to get Previous Week ID
+export function getPrevWeekId(weekId: string): string {
+  return getAdjacentWeekId(weekId, -1);
+}
+
+// Check if a given weekId is the current real-world week
+export function isCurrentWeek(weekId: string): boolean {
+  return weekId === getCurrentSolarWeekId();
+}
+
+// Check if a given date string (YYYY-MM-DD) is today
+export function isDateToday(dateStr: string): boolean {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return dateStr === todayStr;
 }
 
 export interface SolarDateDetail {
@@ -38,6 +97,7 @@ export interface SolarDateDetail {
   formattedFull: string; // 24/08/2026
   displayWithDay: string; // Thứ 2 (24/08)
   displayFullWithDay: string; // Thứ 2, 24/08/2026
+  isToday: boolean;
 }
 
 // Get solar date details for a specific day in a given week
@@ -45,8 +105,7 @@ export function getSolarDateInfo(weekId: string, dayKey: DayOfWeek): SolarDateDe
   const monday = getStartDateOfWeek(weekId);
   const dayInfo = DAYS_OF_WEEK.find((d) => d.key === dayKey) || DAYS_OF_WEEK[0];
   
-  const targetDate = new Date(monday);
-  targetDate.setDate(monday.getDate() + dayInfo.solarOffsetDays);
+  const targetDate = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + dayInfo.solarOffsetDays);
 
   const year = targetDate.getFullYear();
   const month = targetDate.getMonth() + 1;
@@ -58,6 +117,7 @@ export function getSolarDateInfo(weekId: string, dayKey: DayOfWeek): SolarDateDe
   const formattedFull = `${pad(dayOfMonth)}/${pad(month)}/${year}`;
   const displayWithDay = `${dayInfo.label} (${formattedShort})`;
   const displayFullWithDay = `${dayInfo.label}, ${formattedFull}`;
+  const isToday = isDateToday(dateStr);
 
   return {
     dayKey,
@@ -71,6 +131,7 @@ export function getSolarDateInfo(weekId: string, dayKey: DayOfWeek): SolarDateDe
     formattedFull,
     displayWithDay,
     displayFullWithDay,
+    isToday,
   };
 }
 
@@ -105,6 +166,7 @@ export function getSolarDateDetailFromDate(dateStr: string): SolarDateDetail {
     formattedFull,
     displayWithDay: `${dInfo.label} (${formattedShort})`,
     displayFullWithDay: `${dInfo.label}, ${formattedFull}`,
+    isToday: isDateToday(dateStr),
   };
 }
 
@@ -113,11 +175,18 @@ export function getSolarWeekDays(weekId: string): SolarDateDetail[] {
   return DAYS_OF_WEEK.map((d) => getSolarDateInfo(weekId, d.key));
 }
 
-// Get formatted solar date range of a week, e.g., "24/08/2026 – 30/08/2026 (Dương lịch)"
+// Get formatted solar date range of a week, e.g., "24/08/2026 – 30/08/2026"
 export function getSolarWeekRangeText(weekId: string): string {
   const mondayInfo = getSolarDateInfo(weekId, 'mon');
   const sundayInfo = getSolarDateInfo(weekId, 'sun');
   return `${mondayInfo.formattedFull} – ${sundayInfo.formattedFull}`;
+}
+
+// Get clean short range e.g., "24/08 – 30/08/2026"
+export function getSolarWeekShortRangeText(weekId: string): string {
+  const mondayInfo = getSolarDateInfo(weekId, 'mon');
+  const sundayInfo = getSolarDateInfo(weekId, 'sun');
+  return `${mondayInfo.formattedShort} – ${sundayInfo.formattedFull}`;
 }
 
 export interface SolarWeekOption {
@@ -125,30 +194,59 @@ export interface SolarWeekOption {
   weekNumber: number;
   year: number;
   label: string;
+  shortLabel: string;
   solarRangeText: string;
   isCurrent: boolean;
+  isNext: boolean;
+  isPast: boolean;
 }
 
-// Generate selectable solar calendar weeks around current date
-export function getAvailableSolarWeeks(): SolarWeekOption[] {
-  const currentWeekNum = 35;
-  const year = 2026;
+// Generate selectable solar calendar weeks around current date & selected week dynamically
+export function getAvailableSolarWeeks(centerWeekId?: string, pastWeeks = 6, futureWeeks = 10): SolarWeekOption[] {
+  const currentWeekId = getCurrentSolarWeekId();
+  const nextWeekId = getNextWeekId(currentWeekId);
+  const baseWeekId = centerWeekId || currentWeekId;
+  const baseMonday = getStartDateOfWeek(baseWeekId);
+
+  const seen = new Set<string>();
   const weeks: SolarWeekOption[] = [];
 
-  for (let w = 33; w <= 38; w++) {
-    const wId = `${year}-W${w}`;
+  // Generate range from -pastWeeks to +futureWeeks
+  for (let offset = -pastWeeks; offset <= futureWeeks; offset++) {
+    const targetDate = new Date(baseMonday.getFullYear(), baseMonday.getMonth(), baseMonday.getDate() + offset * 7 + 3);
+    const wId = getIsoWeekId(targetDate);
+    if (seen.has(wId)) continue;
+    seen.add(wId);
+
+    const match = wId.match(/^(\d{4})-W(\d{1,2})$/);
+    const year = match ? parseInt(match[1], 10) : 2026;
+    const weekNumber = match ? parseInt(match[2], 10) : 1;
     const rangeText = getSolarWeekRangeText(wId);
-    const isCurrent = w === currentWeekNum;
+    const isCurrent = wId === currentWeekId;
+    const isNext = wId === nextWeekId;
+    const isPast = wId < currentWeekId;
+
+    let tag = '';
+    if (isCurrent) tag = ' • Hiện tại (Tuần này)';
+    else if (isNext) tag = ' • Tuần tiếp theo';
+    else if (isPast) tag = ' • Lịch cũ';
+    else tag = ' • Sắp tới';
+
     weeks.push({
       weekId: wId,
-      weekNumber: w,
+      weekNumber,
       year,
-      label: `Tuần ${w} (${rangeText}) ${isCurrent ? '• Hiện tại' : ''}`,
+      label: `Tuần ${weekNumber} (${rangeText})${tag}`,
+      shortLabel: `Tuần ${weekNumber} (${getSolarWeekShortRangeText(wId)})`,
       solarRangeText: rangeText,
       isCurrent,
+      isNext,
+      isPast,
     });
   }
 
+  // Sort weeks chronologically
+  weeks.sort((a, b) => a.weekId.localeCompare(b.weekId));
   return weeks;
 }
 
@@ -174,3 +272,4 @@ export function formatSolarDateWithWeekday(dateString?: string): string {
   const weekday = weekdays[date.getDay()];
   return `${weekday}, ${formatSolarDate(dateString)} (Dương lịch)`;
 }
+
